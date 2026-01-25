@@ -1,5 +1,7 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react';
+// @ts-ignore
+import AudioProcessorUrl from '../workers/AudioProcessor.worklet.ts?worker&url';
 
 // Configuration matches the C++ RingBuffer logic
 const SAMPLE_RATE = 24000;
@@ -52,12 +54,11 @@ export function useAudioEngine() {
             pointersViewRef.current = pointersView;
 
             // 2. Load Worklet
-            // We use the robust URL constructor to resolve the worklet path relative to the current module
+            // We use strict relative paths to avoid alias resolution issues in the browser.
             try {
-                await ctx.audioWorklet.addModule(new URL('../workers/AudioProcessor.worklet.ts', import.meta.url).href);
+                await ctx.audioWorklet.addModule(AudioProcessorUrl);
             } catch (e) {
                 console.error("Failed to load worklet module:", e);
-                // Fallback or retry logic could go here
                 throw e;
             }
 
