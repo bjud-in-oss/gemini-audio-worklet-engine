@@ -19,7 +19,7 @@ const OverviewPurpose: React.FC = () => {
                         <strong className="text-green-400 text-xs uppercase block mb-1">1. VAD & Input</strong>
                         <p className="text-xs text-slate-400 leading-relaxed">
                             Ljudet passerar först <code>VAD</code> (Voice Activity Detection). 
-                            Om <code>VAD > THR</code> flaggas det som tal (<code>SPK</code>).
+                            Om <code>VAD &gt; THR</code> flaggas det som tal (<code>SPK</code>).
                             <br/><em>Test:</em> Lyser SPK när du pratar? Om inte, sänk C_THR.
                         </p>
                     </div>
