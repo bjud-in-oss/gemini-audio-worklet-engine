@@ -1,0 +1,7 @@
+{
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "name": "25 jan b arbetar på tempo med cirkelbuffer och c++ portning",
+  "description": "Added Audio Pipeline (Visuals) toggle to Tower for improved performance in debug mode. Andrum funktionaliteten verkar vara igång. Funkar bäst med översättning, inte transkription. Nu är ritningen reparerad. Nej ritningen är inte riktigt reparerad ännu, men balansgången mellan dialog och uppläsning är reparerad. Inga upprepningar förekommer och inte heller stammningar."
+}
