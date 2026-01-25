@@ -32,7 +32,7 @@ const VadHysteresisAnalysis: React.FC = () => {
                         <strong className="text-white">Tripp (Basläge):</strong> <code>C_SIL</code> (275ms). Standard vid korta kommandon.<br/>
                         <strong className="text-yellow-400">Trapp (Mjuklandning):</strong> <code>C_SIL / 2</code>. När vi lyssnar på AI:n.<br/>
                         <strong className="text-fuchsia-400">Trull (Ghost/Dam):</strong> <code>1200ms - 2000ms</code>. <br/>
-                        <span className="pl-4 block text-slate-500">- Om DAM > 0: Maximerar tolerans (bufferten måste tömmas).</span>
+                        <span className="pl-4 block text-slate-500">- Om DAM &gt; 0: Maximerar tolerans (bufferten måste tömmas).</span>
                         <span className="pl-4 block text-slate-500">- Om GHOST (Momentum): Sätter 1200ms (Gyllene Medelvägen).</span>
                         <em className="text-slate-500 block mt-2">Detta skapar ett system som "andas" med samtalet och vet skillnad på en paus och ett slut.</em>
                     </p>
