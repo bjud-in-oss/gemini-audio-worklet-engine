@@ -2,81 +2,97 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 
 // --- OUTPUT AUDIO PROCESSOR WORKLET (Embedded) ---
-// Handles Ring Buffer and Elastic Time Stretching
+// Handles Ring Buffer and Elastic Time Stretching via MessagePort (No SharedArrayBuffer)
+// This ensures compatibility with environments missing COOP/COEP headers.
 const OUTPUT_WORKLET_CODE = `
 class AudioProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.audioBuffer = null;
-    this.writeIndexPtr = null;
-    this.readIndexPtr = null;
-    this.localReadIndex = 0.0;
-    this.mask = 0;
-    this.bufferSize = 0;
-    this.initialized = false;
-    this.currentGain = 0.0;
-    this.targetGain = 0.0;
-    this.GAIN_ATTACK = 0.05;
-    this.GAIN_DECAY = 0.01;
+    // Internal Ring Buffer (30 seconds capacity)
+    this.bufferSize = 24000 * 30; 
+    this.buffer = new Float32Array(this.bufferSize);
+    this.writeIndex = 0;
+    this.readIndex = 0;
+    
+    // Config
     this.SAMPLE_RATE = 24000;
-    this.TARGET_LATENCY_FRAMES = 24000 * 0.20;
-    this.MAX_RATE = 1.15;
+    this.TARGET_LATENCY_FRAMES = 24000 * 0.25; // 250ms target latency
+    
+    // Status reporting throttling
+    this.framesSinceLastReport = 0;
+
     this.port.onmessage = this.handleMessage.bind(this);
   }
 
   handleMessage(event) {
-    const { type, payload } = event.data;
-    if (type === 'INIT') {
-      const { sabAudio, sabPointers, size } = payload;
-      this.audioBuffer = new Float32Array(sabAudio);
-      this.writeIndexPtr = new Int32Array(sabPointers, 0, 1);
-      this.readIndexPtr = new Int32Array(sabPointers, 4, 1);
-      this.bufferSize = size;
-      this.mask = size - 1;
-      this.initialized = true;
+    const { type, data } = event.data;
+    if (type === 'PUSH') {
+       this.push(data);
+    }
+  }
+
+  push(chunk) {
+    // Simple Ring Buffer Write
+    // Note: chunk is Float32Array
+    const len = chunk.length;
+    for (let i = 0; i < len; i++) {
+        this.buffer[this.writeIndex % this.bufferSize] = chunk[i];
+        this.writeIndex++;
     }
   }
 
   process(inputs, outputs) {
-    if (!this.initialized || !this.audioBuffer) return true;
-
     const outputChannel = outputs[0][0];
     const outputLength = outputChannel.length;
-    const writeIndex = Atomics.load(this.writeIndexPtr, 0);
-    let fillLevel = (writeIndex - Math.floor(this.localReadIndex));
-    if (fillLevel < 0) fillLevel += 0;
-
-    let rateIncrement = 1.0;
-    if (fillLevel > this.TARGET_LATENCY_FRAMES) {
-      const excess = fillLevel - this.TARGET_LATENCY_FRAMES;
-      const boost = Math.min(this.MAX_RATE - 1.0, (excess / this.SAMPLE_RATE) * 0.5);
-      rateIncrement = 1.0 + boost;
+    
+    // Calculate Fill Level (Available Samples)
+    // JS numbers are doubles (safe integer limit ~9 quadrillion), so simple subtraction works fine for years.
+    let available = this.writeIndex - Math.floor(this.readIndex);
+    
+    // Report status periodically (~100ms)
+    this.framesSinceLastReport += outputLength;
+    if (this.framesSinceLastReport > 2400) { 
+        this.port.postMessage({
+            type: 'STATUS',
+            samples: available,
+            ms: (available / this.SAMPLE_RATE) * 1000
+        });
+        this.framesSinceLastReport = 0;
     }
 
-    if (fillLevel < 2) this.targetGain = 0.0; else this.targetGain = 1.0;
+    if (available < outputLength) {
+        // Underrun - output silence
+        for (let i = 0; i < outputLength; i++) outputChannel[i] = 0;
+        return true;
+    }
 
+    // Elastic Rate Logic
+    // If buffer grows too large, speed up slightly to drain it (Catch-up)
+    let speed = 1.0;
+    if (available > this.TARGET_LATENCY_FRAMES) {
+        // Cap speed increase at +15% to avoid chipmunk effect
+        const excess = available - this.TARGET_LATENCY_FRAMES;
+        const boost = Math.min(0.15, (excess / 24000) * 0.5);
+        speed += boost;
+    }
+
+    // Read Loop with Linear Interpolation
     for (let i = 0; i < outputLength; i++) {
-      if (Math.abs(this.currentGain - this.targetGain) > 0.001) {
-        const factor = this.targetGain > this.currentGain ? this.GAIN_ATTACK : this.GAIN_DECAY;
-        this.currentGain += (this.targetGain - this.currentGain) * factor;
-      } else {
-        this.currentGain = this.targetGain;
-      }
+        const idx = this.readIndex;
+        const idxFloor = Math.floor(idx);
+        const idxCeil = idxFloor + 1;
+        const frac = idx - idxFloor;
 
-      if (this.currentGain > 0.001) {
-        const idx0 = Math.floor(this.localReadIndex);
-        const idx1 = idx0 + 1;
-        const fraction = this.localReadIndex - idx0;
-        const y0 = this.audioBuffer[idx0 & this.mask];
-        const y1 = this.audioBuffer[idx1 & this.mask];
-        const interpolated = y0 + (y1 - y0) * fraction;
-        outputChannel[i] = interpolated * this.currentGain;
-        this.localReadIndex += rateIncrement;
-      } else {
-        outputChannel[i] = 0.0;
-      }
+        const s0 = this.buffer[idxFloor % this.bufferSize];
+        const s1 = this.buffer[idxCeil % this.bufferSize];
+        
+        // Lerp
+        const val = s0 + (s1 - s0) * frac;
+
+        outputChannel[i] = val;
+        this.readIndex += speed;
     }
-    Atomics.store(this.readIndexPtr, 0, Math.floor(this.localReadIndex));
+
     return true;
   }
 }
@@ -84,8 +100,6 @@ registerProcessor('audio-processor', AudioProcessor);
 `;
 
 const SAMPLE_RATE = 24000;
-const BUFFER_SIZE = 8192;
-const MASK = BUFFER_SIZE - 1;
 
 interface AudioEngineState {
     isReady: boolean;
@@ -96,12 +110,11 @@ export function useAudioEngine() {
     const [state, setState] = useState<AudioEngineState>({ isReady: false, audioContext: null });
     
     const audioCtxRef = useRef<AudioContext | null>(null);
-    const sabAudioRef = useRef<SharedArrayBuffer | null>(null);
-    const sabPointersRef = useRef<SharedArrayBuffer | null>(null);
-    const audioViewRef = useRef<Float32Array | null>(null);
-    const pointersViewRef = useRef<Int32Array | null>(null); 
     const workletNodeRef = useRef<AudioWorkletNode | null>(null);
     const workletBlobUrlRef = useRef<string | null>(null);
+    
+    // Buffer Status (Updated via messages from worklet)
+    const bufferStatusRef = useRef({ samples: 0, ms: 0 });
 
     const initAudio = useCallback(async () => {
         if (audioCtxRef.current) return;
@@ -113,17 +126,6 @@ export function useAudioEngine() {
             });
             audioCtxRef.current = ctx;
 
-            // Shared Memory setup
-            const sabAudio = new SharedArrayBuffer(BUFFER_SIZE * 4);
-            const audioView = new Float32Array(sabAudio);
-            const sabPointers = new SharedArrayBuffer(2 * 4);
-            const pointersView = new Int32Array(sabPointers);
-
-            sabAudioRef.current = sabAudio;
-            audioViewRef.current = audioView;
-            sabPointersRef.current = sabPointers;
-            pointersViewRef.current = pointersView;
-
             // Load Worklet from Blob
             if (!workletBlobUrlRef.current) {
                 const blob = new Blob([OUTPUT_WORKLET_CODE], { type: 'application/javascript' });
@@ -134,16 +136,18 @@ export function useAudioEngine() {
 
             const workletNode = new AudioWorkletNode(ctx, 'audio-processor');
             
-            workletNode.port.postMessage({
-                type: 'INIT',
-                payload: { sabAudio, sabPointers, size: BUFFER_SIZE }
-            });
+            // Listen for status updates from the audio thread
+            workletNode.port.onmessage = (e) => {
+                if (e.data.type === 'STATUS') {
+                    bufferStatusRef.current = { samples: e.data.samples, ms: e.data.ms };
+                }
+            };
 
             workletNode.connect(ctx.destination);
             workletNodeRef.current = workletNode;
 
             setState({ isReady: true, audioContext: ctx });
-            console.log("[AudioEngine] Initialized 24kHz Pipeline with SharedArrayBuffer");
+            console.log("[AudioEngine] Initialized 24kHz Pipeline (MessagePort Mode)");
 
         } catch (error) {
             console.error("[AudioEngine] Init Failed:", error);
@@ -151,8 +155,9 @@ export function useAudioEngine() {
     }, []);
 
     const pushPCM = useCallback((base64Data: string) => {
-        if (!audioViewRef.current || !pointersViewRef.current) return;
+        if (!workletNodeRef.current) return;
 
+        // 1. Decode Base64 -> Float32
         const binaryString = atob(base64Data);
         const len = binaryString.length;
         const bytes = new Uint8Array(len);
@@ -160,24 +165,23 @@ export function useAudioEngine() {
             bytes[i] = binaryString.charCodeAt(i);
         }
         const int16View = new Int16Array(bytes.buffer);
-
-        let writeIndex = Atomics.load(pointersViewRef.current, 0);
-
+        
+        // Allocate Float32 buffer
+        const float32Data = new Float32Array(int16View.length);
         for (let i = 0; i < int16View.length; i++) {
-            const floatSample = int16View[i] / 32768.0;
-            audioViewRef.current[writeIndex & MASK] = floatSample;
-            writeIndex++;
+            float32Data[i] = int16View[i] / 32768.0;
         }
 
-        Atomics.store(pointersViewRef.current, 0, writeIndex);
+        // 2. Send to Worklet via MessagePort (Transferable for zero-copy performance)
+        workletNodeRef.current.port.postMessage({
+            type: 'PUSH',
+            data: float32Data
+        }, [float32Data.buffer]); 
+
     }, []);
 
     const getBufferStatus = useCallback(() => {
-        if (!pointersViewRef.current) return { samples: 0, ms: 0 };
-        const writeIndex = Atomics.load(pointersViewRef.current, 0);
-        const readIndex = Atomics.load(pointersViewRef.current, 1);
-        const diff = writeIndex - readIndex;
-        return { samples: diff, ms: (diff / SAMPLE_RATE) * 1000 };
+        return bufferStatusRef.current;
     }, []);
 
     const resumeContext = useCallback(async () => {
@@ -186,6 +190,7 @@ export function useAudioEngine() {
         }
     }, []);
 
+    // Cleanup
     useEffect(() => {
         return () => {
             if (workletBlobUrlRef.current) {
