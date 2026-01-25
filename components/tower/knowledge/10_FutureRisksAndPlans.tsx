@@ -89,8 +89,8 @@ const FutureRisksAndPlans: React.FC = () => {
                             <strong className="text-yellow-400 text-xs uppercase tracking-widest">Nivå 4: Djupare Kritik (Arkitektur)</strong>
                             <p className="text-slate-300 mt-1 text-sm">
                                 "Vänta. Vår VAD-modell (ONNX) ligger i en Web Worker. AudioWorklet ligger i en annan tråd. 
-                                Om vi byter, måste ljudet gå: <code>AudioWorklet -> Main Thread -> Web Worker</code>. 
-                                Det är två hopp (Double-Hop). Idag går det <code>Main -> Worker</code> (Ett hopp). 
+                                Om vi byter, måste ljudet gå: <code>AudioWorklet -&gt; Main Thread -&gt; Web Worker</code>. 
+                                Det är två hopp (Double-Hop). Idag går det <code>Main -&gt; Worker</code> (Ett hopp). 
                                 Vi riskerar att införa mer jitter och CPU-overhead på Main Thread bara för att slussa data."
                             </p>
                         </div>
@@ -104,7 +104,7 @@ const FutureRisksAndPlans: React.FC = () => {
                                 <p className="leading-relaxed text-sm">
                                     En naiv implementering (via Main Thread) förkastas pga Nivå 4-kritiken. 
                                     Lösningen är att skapa en direkt kanal mellan AudioWorklet och VAD-Workern genom att skicka en <code>MessagePort</code>. 
-                                    Detta tillåter ljudet att flöda <code>AudioWorklet -> VAD Worker</code> helt utan att nudda Main Thread/UI.
+                                    Detta tillåter ljudet att flöda <code>AudioWorklet -&gt; VAD Worker</code> helt utan att nudda Main Thread/UI.
                                 </p>
                                 <div className="mt-3 pt-2 border-t border-emerald-500/20 text-xs text-emerald-300 font-mono">
                                     RESULTAT: "The Holy Grail" - 0% UI-påverkan på ljudet.
