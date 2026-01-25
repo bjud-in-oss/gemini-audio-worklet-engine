@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface TowerMaintenanceProps {
@@ -53,7 +54,7 @@ const TowerMaintenance: React.FC<TowerMaintenanceProps> = ({ onClose }) => {
                     <div className="grid grid-cols-2 gap-2 text-xs">
                         <div className="bg-slate-950 p-2 rounded border border-slate-700">
                             <strong className="text-white block mb-1">Problem</strong>
-                            Animationer (rAF) blockerar Main Thread > 16ms. Ljudbufferten hinner inte tömmas -> "Klickljud".
+                            Animationer (rAF) blockerar Main Thread &gt; 16ms. Ljudbufferten hinner inte tömmas -&gt; "Klickljud".
                         </div>
                         <div className="bg-slate-950 p-2 rounded border border-slate-700">
                             <strong className="text-green-400 block mb-1">Lösning (Nu)</strong>
