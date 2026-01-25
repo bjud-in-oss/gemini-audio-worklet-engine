@@ -28,7 +28,38 @@ interface UseAudioInputProps {
     shieldBufferRef: React.MutableRefObject<string[]>;
 }
 
-// --- BLOB WORKER CODE (Unchanged) ---
+// --- INPUT PROCESSOR WORKLET (Embedded) ---
+// Replaces ScriptProcessorNode. Buffers 4096 samples to match VAD expectations.
+const INPUT_WORKLET_CODE = `
+class InputProcessor extends AudioWorkletProcessor {
+    constructor() {
+        super();
+        this.bufferSize = 4096;
+        this.buffer = new Float32Array(this.bufferSize);
+        this.writeIndex = 0;
+    }
+
+    process(inputs, outputs, parameters) {
+        const input = inputs[0];
+        if (input && input.length > 0) {
+            const channelData = input[0];
+            // Accumulate samples
+            for (let i = 0; i < channelData.length; i++) {
+                this.buffer[this.writeIndex++] = channelData[i];
+                if (this.writeIndex >= this.bufferSize) {
+                    // Flush buffer to main thread
+                    this.port.postMessage(this.buffer.slice());
+                    this.writeIndex = 0;
+                }
+            }
+        }
+        return true;
+    }
+}
+registerProcessor('input-processor', InputProcessor);
+`;
+
+// --- VAD WORKER CODE (Unchanged) ---
 const VAD_WORKER_CODE = `
 function calculateRMS(data) {
     let sum = 0;
@@ -50,7 +81,6 @@ class NeuralVad {
 
     async init() {
         try {
-            // Dynamic import for ONNX Runtime Web
             let ortModule;
             try {
                 ortModule = await import('https://esm.sh/onnxruntime-web@1.19.0');
@@ -83,9 +113,7 @@ class NeuralVad {
                         modelBuffer = await response.arrayBuffer();
                         break;
                     } 
-                } catch (fetchErr) {
-                    // Continue
-                }
+                } catch (fetchErr) {}
             }
 
             if (!modelBuffer) {
@@ -135,13 +163,7 @@ class NeuralVad {
 
                 const inputTensor = new this.ort.Tensor('float32', chunk, [1, windowSize]);
 
-                const feeds = {
-                    input: inputTensor,
-                    sr: this.sr,
-                    h: this.h,
-                    c: this.c
-                };
-
+                const feeds = { input: inputTensor, sr: this.sr, h: this.h, c: this.c };
                 const results = await this.session.run(feeds);
 
                 this.h = results.hn;
@@ -150,10 +172,8 @@ class NeuralVad {
                 const output = results.output.data[0];
                 if (output > maxProb) maxProb = output;
             }
-
             return maxProb;
         } catch (e) {
-            console.error("[NeuralVad] Runtime error", e);
             this.loadFailed = true;
             return 0;
         }
@@ -226,11 +246,14 @@ export function useAudioInput({
     const [currentLatency, setCurrentLatency] = useState(0);
 
     const inputContextRef = useRef<AudioContext | null>(null);
-    const processorRef = useRef<ScriptProcessorNode | null>(null);
+    const workletNodeRef = useRef<AudioWorkletNode | null>(null); // Replaces processorRef
     const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
     const workerRef = useRef<Worker | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
-    const blobUrlRef = useRef<string | null>(null);
+    
+    // Blob URLs for cleanup
+    const vadBlobUrlRef = useRef<string | null>(null);
+    const inputWorkletBlobUrlRef = useRef<string | null>(null);
 
     const pcmBufferRef = useRef<Float32Array[]>([]);
 
@@ -251,6 +274,7 @@ export function useAudioInput({
     const speechStartTimeRef = useRef(0);
     const silenceStartTimeRef = useRef(0);
     
+    // Update Refs
     useEffect(() => { activeModeRef.current = activeMode; }, [activeMode]);
     useEffect(() => { vadThresholdRef.current = vadThreshold; }, [vadThreshold]);
     useEffect(() => { minTurnDurationRef.current = minTurnDuration; }, [minTurnDuration]);
@@ -258,10 +282,8 @@ export function useAudioInput({
     useEffect(() => { elasticityStartRef.current = elasticityStart; }, [elasticityStart]);
     useEffect(() => { minSpeechDurationRef.current = minSpeechDuration; }, [minSpeechDuration]);
     useEffect(() => { volMultiplierRef.current = volMultiplier; }, [volMultiplier]);
-    
     useEffect(() => { momentumStartRef.current = momentumStart; }, [momentumStart]);
     useEffect(() => { ghostToleranceRef.current = ghostTolerance; }, [ghostTolerance]);
-    
     useEffect(() => { bufferGapRef.current = bufferGap; }, [bufferGap]);
 
     const flushTurn = useCallback(() => {
@@ -281,9 +303,7 @@ export function useAudioInput({
 
         const durationMs = (totalLength / 16000) * 1000;
 
-        // Note: For injected audio, we might bypass the minSpeechDuration check if it's artificially short
-        // but normally we generate enough data.
-        if (durationMs > 50) { // Reduced threshold for flush safety
+        if (durationMs > 50) { 
             const pcmBlob = createPcmBlob(fullBuffer);
             const turnId = Date.now().toString();
             
@@ -309,14 +329,10 @@ export function useAudioInput({
         const now = Date.now();
         const mode = activeModeRef.current;
         
-        // --- STANDARD VAD LOGIC ---
         const effectiveThreshold = vadThresholdRef.current;
-
-        // Hysteresis
         const sustainThreshold = effectiveThreshold * 0.6;
         const activeThreshold = isSpeakingRef.current ? sustainThreshold : effectiveThreshold;
 
-        // Diagnostics
         if (audioDiagnosticsRef.current) {
             audioDiagnosticsRef.current.rms = rms;
             audioDiagnosticsRef.current.vadProb = prob;
@@ -343,7 +359,7 @@ export function useAudioInput({
                 
                 const speechDurationSec = (now - speechStartTimeRef.current) / 1000;
                 
-                // --- HARD FLUSH SAFETY (REVERTED TO 25s) ---
+                // Hard Flush Safety
                 if (speechDurationSec > 25.0) {
                     console.log("[AudioInput] ⚠️ Hard Flushing due to >25s speech duration.");
                     isSpeakingRef.current = false;
@@ -351,49 +367,34 @@ export function useAudioInput({
                     return;
                 }
                 
-                // --- HYDRAULIC VAD (Tripp Trapp Trull) ---
+                // Hydraulic Logic
                 const cSil = silenceThresholdRef.current;
-                const damPressure = shieldBufferRef.current.length; // DAM (Physical packets waiting)
-                const jitterPressure = bufferGapRef.current; // JIT (Incoming audio gap)
+                const damPressure = shieldBufferRef.current.length; 
+                const jitterPressure = bufferGapRef.current; 
                 
-                // GHOST PRESSURE (MOMENTUM): 
-                const momentumLimit = momentumStartRef.current; // e.g. 3.0s
-                const ghostTol = ghostToleranceRef.current; // e.g. 1200ms
-                
+                const momentumLimit = momentumStartRef.current;
+                const ghostTol = ghostToleranceRef.current;
                 const hasGhostPressure = speechDurationSec > momentumLimit;
 
-                let hydraulicTarget = 275; // Base floor (Tripp)
+                let hydraulicTarget = 275; 
 
                 if (damPressure > 0) {
-                    // TRULL (Blockage Mode)
-                    // If we have unsent packets, we MUST NOT cut. Max tolerance.
                     hydraulicTarget = Math.min(cSil * 2, 2000); 
                 } else if (hasGhostPressure) {
-                    // TRULL (Momentum Mode / Ghost Pressure)
-                    // If simply speaking long, we allow breath pauses.
                     hydraulicTarget = ghostTol; 
                 } else if (jitterPressure > 0.1) {
-                    // TRAPP (Listening Mode)
-                    // AI is talking, allow user to think (Soft Landing)
                     hydraulicTarget = Math.max(cSil / 2, 275); 
                 } else {
-                    // TRIPP (Ping Pong Mode)
-                    // Fast dialogue
                     hydraulicTarget = 275;
                 }
 
-                // --- THE SQUEEZE (Override) ---
+                // The Squeeze
                 let currentSilenceThresh = hydraulicTarget;
-
-                if (speechDurationSec > 20) { // REVERTED TO 20s START
+                if (speechDurationSec > 20) { 
                     const squeezeStart = 20.0;
-                    const squeezeEnd = 25.0; // REVERTED TO 25s END
+                    const squeezeEnd = 25.0; 
                     const minFloor = 100;
-                    
-                    // Linear interpolation 0.0 -> 1.0
                     const progress = Math.min(1, Math.max(0, (speechDurationSec - squeezeStart) / (squeezeEnd - squeezeStart)));
-                    
-                    // Interpolate from Hydraulic Target down to 100ms
                     currentSilenceThresh = hydraulicTarget - ((hydraulicTarget - minFloor) * progress);
                     currentSilenceThresh = Math.max(minFloor, currentSilenceThresh);
                 }
@@ -401,8 +402,6 @@ export function useAudioInput({
                 if (audioDiagnosticsRef.current) {
                     audioDiagnosticsRef.current.silenceDuration = (now - silenceStartTimeRef.current) / 1000;
                     audioDiagnosticsRef.current.currentSilenceThreshold = currentSilenceThresh;
-                    
-                    // NEW: Expose Ghost Status
                     audioDiagnosticsRef.current.ghostActive = hasGhostPressure;
                 }
 
@@ -416,17 +415,15 @@ export function useAudioInput({
         if (isSpeakingRef.current || (mode === 'translate')) {
              if (isSpeakingRef.current) {
                  pcmBufferRef.current.push(chunk);
-                 
                  if (audioDiagnosticsRef.current) {
                      audioDiagnosticsRef.current.bufferSize = pcmBufferRef.current.length;
                  }
-                 
-                 // STREAMING (Logic moved to useGeminiLive to handle the Shield)
+                 // Stream data (managed by GeminiLive hook)
                  const pcmBlob = createPcmBlob(chunk);
                  onAudioData(pcmBlob.data); 
              }
         }
-    }, [busyUntilRef, audioDiagnosticsRef, flushTurn, onAudioData, shieldBufferRef]); // Added shieldBufferRef to deps
+    }, [busyUntilRef, audioDiagnosticsRef, flushTurn, onAudioData, shieldBufferRef]);
 
     const latestHandlerRef = useRef(handleWorkerResult);
     
@@ -434,12 +431,13 @@ export function useAudioInput({
         latestHandlerRef.current = handleWorkerResult;
     }, [handleWorkerResult]);
 
+    // Initialize VAD Worker
     useEffect(() => {
         if (!workerRef.current) {
             try {
                 const blob = new Blob([VAD_WORKER_CODE], { type: 'application/javascript' });
                 const blobUrl = URL.createObjectURL(blob);
-                blobUrlRef.current = blobUrl;
+                vadBlobUrlRef.current = blobUrl;
 
                 workerRef.current = new Worker(blobUrl, { type: 'module' });
                 
@@ -458,9 +456,9 @@ export function useAudioInput({
                 workerRef.current.terminate();
                 workerRef.current = null;
             }
-            if (blobUrlRef.current) {
-                URL.revokeObjectURL(blobUrlRef.current);
-                blobUrlRef.current = null;
+            if (vadBlobUrlRef.current) {
+                URL.revokeObjectURL(vadBlobUrlRef.current);
+                vadBlobUrlRef.current = null;
             }
         };
     }, []);
@@ -471,6 +469,15 @@ export function useAudioInput({
         try {
             const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
             inputContextRef.current = ctx;
+
+            // Prepare Input Worklet Blob
+            if (!inputWorkletBlobUrlRef.current) {
+                const blob = new Blob([INPUT_WORKLET_CODE], { type: 'application/javascript' });
+                inputWorkletBlobUrlRef.current = URL.createObjectURL(blob);
+            }
+
+            // Load Worklet
+            await ctx.audioWorklet.addModule(inputWorkletBlobUrlRef.current!);
 
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: {
@@ -487,12 +494,15 @@ export function useAudioInput({
             const source = ctx.createMediaStreamSource(stream);
             sourceRef.current = source;
 
-            const processor = ctx.createScriptProcessor(4096, 1, 1);
-            processorRef.current = processor;
+            // Create AudioWorkletNode instead of ScriptProcessor
+            const workletNode = new AudioWorkletNode(ctx, 'input-processor');
+            workletNodeRef.current = workletNode;
 
-            processor.onaudioprocess = (e) => {
-                const inputData = e.inputBuffer.getChannelData(0);
+            // Handle data from worklet
+            workletNode.port.onmessage = (e) => {
+                const inputData = e.data; // Float32Array from worklet
                 if (workerRef.current) {
+                    // Offload to VAD worker
                     workerRef.current.postMessage({
                         command: 'PROCESS',
                         data: inputData,
@@ -501,8 +511,8 @@ export function useAudioInput({
                 }
             };
 
-            source.connect(processor);
-            processor.connect(ctx.destination);
+            source.connect(workletNode);
+            workletNode.connect(ctx.destination); // Keep alive
 
             if (audioDiagnosticsRef.current) {
                 audioDiagnosticsRef.current.audioContextState = 'running';
@@ -516,10 +526,10 @@ export function useAudioInput({
     }, [inputDeviceId, audioDiagnosticsRef]);
 
     const stopAudioInput = useCallback(() => {
-        if (processorRef.current) {
-            processorRef.current.disconnect();
-            processorRef.current.onaudioprocess = null;
-            processorRef.current = null;
+        if (workletNodeRef.current) {
+            workletNodeRef.current.disconnect();
+            workletNodeRef.current.port.onmessage = null;
+            workletNodeRef.current = null;
         }
         if (sourceRef.current) {
             sourceRef.current.disconnect();
@@ -555,32 +565,30 @@ export function useAudioInput({
     const injectTextAsAudio = useCallback(async (text: string): Promise<string> => {
         console.log("[AudioInput] Mock Inject Generating:", text);
         isSpeakingRef.current = true;
-        
-        // Generate mock audio data so that onAudioData streams it and pcmBuffer fills up.
-        // We simulate 10 chunks of 100ms silence/noise.
         const chunks = 10;
-        const chunkSize = 1600; // 100ms at 16kHz
+        const chunkSize = 1600; 
         
         for(let i=0; i<chunks; i++) {
-            // Low level noise to simulate presence
             const chunk = new Float32Array(chunkSize).map(() => (Math.random() - 0.5) * 0.05);
-            
-            // 1. Buffer for VAD flush logic
             pcmBufferRef.current.push(chunk);
-            
-            // 2. Stream immediately to simulate real-time packet arrival
             const pcmBlob = createPcmBlob(chunk);
             onAudioData(pcmBlob.data);
-            
-            // Wait 100ms between chunks
             await new Promise(r => setTimeout(r, 100));
         }
 
         isSpeakingRef.current = false;
-        // This will now find data in pcmBufferRef and trigger onPhraseDetected
         flushTurn();
         return "Success";
     }, [flushTurn, onAudioData]);
+
+    // Cleanup Blobs on unmount
+    useEffect(() => {
+        return () => {
+            if (inputWorkletBlobUrlRef.current) {
+                URL.revokeObjectURL(inputWorkletBlobUrlRef.current);
+            }
+        };
+    }, []);
 
     return {
         initAudioInput,
