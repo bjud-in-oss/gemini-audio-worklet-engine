@@ -95,7 +95,7 @@ const VadDynamics: React.FC = () => {
                 <div className="bg-slate-950 p-4 rounded border border-slate-800 font-mono text-xs space-y-3">
                     <div className="text-rose-300 font-bold border-b border-slate-800 pb-2 text-xs flex justify-between">
                         <span>SÄKERHETSPÄRR: THE SQUEEZE</span>
-                        <span className="text-slate-500">Trigger: Taltid > 20s</span>
+                        <span className="text-slate-500">Trigger: Taltid &gt; 20s</span>
                     </div>
 
                     <div className="flex items-center gap-4 pt-2">

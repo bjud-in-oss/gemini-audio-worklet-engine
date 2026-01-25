@@ -44,7 +44,7 @@ const ArchitectureDeepDiveBlob: React.FC = () => {
                 {/* 3. STABILITY PACKAGE */}
                 <div>
                     <h4 className="text-white font-bold mb-2 border-b border-slate-800 pb-1 text-sm">
-                        Stabilitetspaket: För Sessioner > 20 min
+                        Stabilitetspaket: För Sessioner &gt; 20 min
                     </h4>
                     <ul className="space-y-2 text-sm text-slate-400 list-disc list-inside">
                         <li>
