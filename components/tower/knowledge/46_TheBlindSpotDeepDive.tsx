@@ -20,7 +20,7 @@ const TheBlindSpotDeepDive: React.FC = () => {
                     <h4 className="text-white font-bold text-xs uppercase tracking-widest border-l-4 border-red-500 pl-3">Fenomenet: Server Refractory Period</h4>
                     <div className="bg-slate-950 p-4 rounded border border-slate-800 space-y-2">
                         <p className="text-xs text-slate-400">
-                            <strong>Tidigare logik:</strong> <code>TurnComplete</code> -> Vänta 0ms -> Spola Buffert.
+                            <strong>Tidigare logik:</strong> <code>TurnComplete</code> → Vänta 0ms → Spola Buffert.
                             <br/>
                             <strong>Resultat:</strong> Servern klippte de första 1-2 sekunderna av ljudet. Den trodde det var "eko" eller brus från föregående tur.
                         </p>

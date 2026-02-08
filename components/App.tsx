@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useGeminiLive } from '../hooks/useGeminiLive';
 import { useWakeLock } from '../hooks/useWakeLock';
@@ -200,6 +199,7 @@ const App: React.FC = () => {
         customSystemInstruction={customSystemInstruction}
         setCustomSystemInstruction={setCustomSystemInstruction}
         targetLanguages={targetLanguages}
+        onLanguagesChange={handleSaveLanguages}
         aiSpeakingRate={aiSpeakingRate}
         allLanguages={ALL_LANGUAGES}
       />
