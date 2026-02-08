@@ -19,6 +19,15 @@ const BargeInDeepDive: React.FC = () => {
                     </p>
                 </div>
 
+                <div className="bg-yellow-900/20 p-4 rounded border border-yellow-500/30 mb-4">
+                    <strong className="text-yellow-300 text-xs uppercase block mb-1">VIKTIGT: Skölden klipper inte sladden</strong>
+                    <p className="text-xs text-slate-400">
+                        Skölden kopplar <strong>inte</strong> bort mikrofonen fysiskt. Det skulle göra att vi tappar ord.
+                        Istället styr den om ljudet till en temporär buffert ("Dammen"). 
+                        När AI:n har pratat klart, öppnas dammluckorna och allt sparat ljud skickas iväg som en snabb sekvens.
+                    </p>
+                </div>
+
                 {/* LOGIC PHASES */}
                 <div className="space-y-6 relative pl-4 border-l-2 border-slate-700 ml-2 mt-4">
                     
@@ -27,8 +36,8 @@ const BargeInDeepDive: React.FC = () => {
                         <div className="absolute -left-[21px] top-0 w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
                         <h5 className="font-bold text-white mb-1 text-sm">Fas 1: Prediktiv Sköld (Olinjär Gissning)</h5>
                         <p className="text-slate-400 text-xs">
-                            När VAD upptäcker tystnad aktiveras skölden. Tiden beräknas olinjärt baserat på längden på ditt tal + en fast säkerhetsmarginal. 
-                            <br/><em>Logik:</em> Vi vet inte OM den svarar, så vi tar höjd. AI:n genererar långa texter snabbare per ord än korta (uppstartskostnad minskar relativt).
+                            När VAD upptäcker tystnad aktiveras skölden (Buffring startar). Tiden beräknas olinjärt baserat på längden på ditt tal + en fast säkerhetsmarginal. 
+                            <br/><em>Logik:</em> Vi vet inte OM den svarar, så vi tar höjd.
                         </p>
                     </div>
 
@@ -47,7 +56,7 @@ const BargeInDeepDive: React.FC = () => {
                         <div className="absolute -left-[21px] top-0 w-3 h-3 rounded-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>
                         <h5 className="font-bold text-white mb-1 text-sm">Fas 3: TurnComplete (Absolut)</h5>
                         <p className="text-slate-400 text-xs">
-                            Om signalen <code>TurnComplete</code> anländer, öppnas skölden <strong>omedelbart</strong>, oavsett vad timers säger. 
+                            Om signalen <code>TurnComplete</code> anländer, öppnas skölden <strong>omedelbart</strong> och bufferten töms ("flush"). 
                             Detta är den ultimata sanningen som nollställer systemet.
                         </p>
                     </div>

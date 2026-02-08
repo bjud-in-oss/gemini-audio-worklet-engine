@@ -32,6 +32,9 @@ export interface DiagnosticData {
     // GHOST METRICS
     ghostActive: boolean; // Is "Ghost Pressure" (Momentum) currently active?
 
+    // PUPPETEER METRICS
+    puppeteerState: string; // 'IDLE' | 'REPEAT' | 'FILLER' | 'CUT'
+
     // SHIELD METRICS (The Dam)
     shieldActive: boolean; // Is the shield currently blocking TX?
     shieldSize: number;    // How many packets are held in the dam?

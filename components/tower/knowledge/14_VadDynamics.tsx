@@ -11,7 +11,7 @@ const VadDynamics: React.FC = () => {
             <div className="bg-slate-900/80 p-5 rounded-xl border border-teal-500/20 text-slate-300 text-sm space-y-6">
                 
                 <p className="text-sm text-slate-400 leading-relaxed">
-                    Implementation v8.0. Systemet styrs nu helt av <strong>trycket</strong> i två riktningar. Utgående tryck (Användaren) och Inkommande tryck (AI:n).
+                    Implementation v8.0. Systemet styrs nu helt av <strong>trycket</strong> i två riktningar.
                 </p>
 
                 {/* LOGIC TABLE */}
@@ -32,7 +32,7 @@ const VadDynamics: React.FC = () => {
                             <div className="text-slate-500 mb-2 flex flex-col gap-1 bg-slate-900/50 p-2 rounded border border-slate-800">
                                 <div className="flex justify-between">
                                     <span>Villkor A (Materia):</span>
-                                    <code className="text-blue-300">DAM &gt; 0</code>
+                                    <code className="text-blue-300">DAM &gt; 0 (Utgående Buffert)</code>
                                 </div>
                                 <div className="flex justify-between">
                                     <span>Villkor B (Rörelse):</span>
@@ -40,12 +40,8 @@ const VadDynamics: React.FC = () => {
                                 </div>
                             </div>
                             <div className="text-[10px] text-slate-400 italic leading-relaxed">
-                                <p className="mb-1"><strong className="text-slate-300">Utgående Tryck:</strong> Definitionen är inte bara "full buffert".</p>
-                                <ul className="list-disc list-inside pl-1 text-slate-500">
-                                    <li>Om <strong>Dammen</strong> är full (långsamt nät), MÅSTE vi vänta.</li>
-                                    <li>Om <strong>Ghost</strong> är aktivt (långt tal), VILL vi vänta (Andrum).</li>
-                                </ul>
-                                <span className="text-red-900/80 block mt-1">Effekt: Toleransen ökar kraftigt.</span>
+                                <p className="mb-1"><strong className="text-slate-300">Utgående Tryck:</strong> Om vi har buffrad data som väntar (DAM), ELLER om du pratat länge (GHOST), måste vi öka toleransen.</p>
+                                <span className="text-red-900/80 block mt-1">Effekt: Vi väntar in andningspauser.</span>
                             </div>
                         </div>
                     </div>
@@ -61,10 +57,10 @@ const VadDynamics: React.FC = () => {
                                 <span className="text-yellow-400 font-bold">HALVERA</span>
                             </div>
                             <div className="text-slate-500 mb-1">
-                                Villkor: <code className="text-slate-300">JITTER &gt; 0</code> (Inkommande Tryck)
+                                Villkor: <code className="text-slate-300">JITTER &gt; 0.1s</code> (Inkommande Tryck)
                             </div>
                             <p className="text-[10px] text-slate-400 italic">
-                                Användaren är tyst, men AI:n pratar. Vi sänker toleransen stegvis för att tillåta eftertanke utan att bli för aggressiva.
+                                Användaren är tyst, men AI:n pratar (Jitter bufferten spelar upp). Vi sänker toleransen stegvis för att tillåta eftertanke utan att bli för aggressiva.
                                 <br/><span className="text-yellow-900/80">Ny SIL = max(SIL / 2, BASE_SIL)</span>
                             </p>
                         </div>
@@ -81,10 +77,10 @@ const VadDynamics: React.FC = () => {
                                 <span className="text-green-400 font-bold">BASE_SIL (275ms)</span>
                             </div>
                             <div className="text-slate-500 mb-1">
-                                Villkor: <code className="text-slate-300">INGET TRYCK</code>
+                                Villkor: <code className="text-slate-300">INGET TRYCK (Varken In eller Ut)</code>
                             </div>
                             <p className="text-[10px] text-slate-400 italic">
-                                Varken Dam, Ghost eller Jitter. Total jämvikt. Vi går in i "Ping-Pong"-läge med maximal responsivitet.
+                                Total jämvikt. Vi går in i "Ping-Pong"-läge med maximal responsivitet.
                                 <br/><span className="text-green-900/80">Ny SIL = 275ms</span>
                             </p>
                         </div>

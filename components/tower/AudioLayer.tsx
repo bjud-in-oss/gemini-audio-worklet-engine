@@ -4,7 +4,6 @@ import { LayerProps } from './types';
 // IMPORT NEW COMPONENTS
 import BufferVisualizer from '../BufferVisualizer';
 import JitterSimulator from '../JitterSimulator';
-import { useGeminiLive } from '../../hooks/useGeminiLive';
 
 export interface AudioLayerRefs {
     rmsRef: HTMLSpanElement | null;
@@ -17,17 +16,28 @@ export interface AudioLayerRefs {
 interface AudioLayerProps extends LayerProps {
     volMultiplier: number;
     setVolMultiplier: (val: number) => void;
+    // New props injected from parent (Tower)
+    getBufferStatus?: () => { samples: number; ms: number; speed?: number };
+    isJitterEnabled?: boolean;
+    setIsJitterEnabled?: (val: boolean) => void;
+    jitterIntensity?: number;
+    setJitterIntensity?: (val: number) => void;
 }
 
-const AudioLayer = forwardRef<AudioLayerRefs, AudioLayerProps>(({ onExplain, volMultiplier, setVolMultiplier, highlightMap }, ref) => {
+const AudioLayer = forwardRef<AudioLayerRefs, AudioLayerProps>(({ 
+    onExplain, 
+    volMultiplier, 
+    setVolMultiplier, 
+    highlightMap,
+    getBufferStatus,
+    isJitterEnabled,
+    setIsJitterEnabled,
+    jitterIntensity,
+    setJitterIntensity
+}, ref) => {
     
     const [isEditing, setIsEditing] = useState(false);
     
-    // Access the engine tools from the main hook
-    // Note: In a stricter architecture, these should be passed as props, 
-    // but consuming the hook here is acceptable for this dev-tool overlay context.
-    const { getBufferStatus, isJitterEnabled, setIsJitterEnabled } = useGeminiLive();
-
     const setRef = (key: keyof AudioLayerRefs) => (el: any) => {
         if (ref && typeof ref === 'object' && ref.current) {
             ref.current[key] = el;
@@ -37,12 +47,9 @@ const AudioLayer = forwardRef<AudioLayerRefs, AudioLayerProps>(({ onExplain, vol
     // STANDARDISERAD KNAPP-DESIGN
     const getHighlightClass = (id: string) => {
         const type = highlightMap?.[id];
-        // Priority 1: Selected/Highlighted states
         if (type === 'self') return 'ring-2 ring-white bg-slate-700 scale-105 shadow-xl z-20';
         if (type === 'incoming') return 'ring-1 ring-blue-500 bg-blue-500/20';
         if (type === 'outgoing') return 'ring-1 ring-yellow-500 bg-yellow-500/20';
-        
-        // Priority 2: Default State (Consistent across all grids)
         return 'bg-slate-900/50 hover:bg-slate-800';
     };
 
@@ -108,7 +115,12 @@ const AudioLayer = forwardRef<AudioLayerRefs, AudioLayerProps>(({ onExplain, vol
                     <BufferVisualizer getBufferStatus={getBufferStatus} />
                 )}
                 {setIsJitterEnabled && (
-                    <JitterSimulator isEnabled={isJitterEnabled} setIsEnabled={setIsJitterEnabled} />
+                    <JitterSimulator 
+                        isEnabled={isJitterEnabled || false} 
+                        setIsEnabled={setIsJitterEnabled} 
+                        jitterIntensity={jitterIntensity}
+                        setJitterIntensity={setJitterIntensity}
+                    />
                 )}
             </div>
         </div>

@@ -24,7 +24,7 @@ const TowerMaintenance: React.FC<TowerMaintenanceProps> = ({ onClose }) => {
             {/* SECTION 1: CRITICAL RESOURCES */}
             <section>
                 <h4 className="text-xs font-bold text-red-400 uppercase tracking-widest mb-3">
-                    1. Minnesläckage & Resurser
+                    1. Kritisk Resurshantering
                 </h4>
                 <div className="text-sm text-slate-400 space-y-3 leading-relaxed">
                     <ul className="list-disc list-inside space-y-2 ml-1 text-slate-300">
@@ -41,44 +41,37 @@ const TowerMaintenance: React.FC<TowerMaintenanceProps> = ({ onClose }) => {
                 </div>
             </section>
 
-            {/* SECTION 2: PERFORMANCE STRATEGY (NEW) */}
+            {/* SECTION 2: PRESTANDA */}
             <section>
-                <h4 className="text-xs font-bold text-yellow-400 uppercase tracking-widest mb-3 mt-6">
-                    2. Prestanda & UI-Konflikter (v6.5)
+                <h4 className="text-xs font-bold text-green-400 uppercase tracking-widest mb-3 mt-6">
+                    2. Prestanda (AudioWorklet)
                 </h4>
                 <div className="bg-slate-900/50 p-3 rounded text-sm text-slate-400 space-y-3">
                     <p>
-                        Vi har infört tung grafik (Karaoke-animering, Fysik-scroll, Karta). Eftersom ljudmotorn (ScriptProcessor) delar tråd med UI:t, skapar detta en konflikt.
+                        Vi har migrerat från <code>ScriptProcessor</code> till <code>AudioWorklet + MessagePort</code>. Detta eliminerar "klickljud" vid tung UI-rendering.
                     </p>
-                    
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="bg-slate-950 p-2 rounded border border-slate-700">
-                            <strong className="text-white block mb-1">Problem</strong>
-                            Animationer (rAF) blockerar Main Thread &gt; 16ms. Ljudbufferten hinner inte tömmas -&gt; "Klickljud".
-                        </div>
-                        <div className="bg-slate-950 p-2 rounded border border-slate-700">
-                            <strong className="text-green-400 block mb-1">Lösning (Nu)</strong>
-                            <span className="text-white font-mono">Buffer = 4096</span>. 
-                            Vi ökar bufferten (Latens: ~250ms) för att ge UI:t dubbelt så lång tid att rita mellan ljud-events.
-                        </div>
-                    </div>
-
                     <div className="text-xs bg-indigo-900/20 p-2 rounded border border-indigo-500/30 text-indigo-300">
-                        <strong>Långsiktig Plan:</strong> Byt till <code>AudioWorklet</code> (se Modul 10 i Kunskapsbanken) för att frikoppla ljudet helt från grafiken.
+                        <strong>Buffert:</strong> 2048 samples (128ms). 50% lägre latens än tidigare.
                     </div>
                 </div>
             </section>
 
-            {/* SECTION 3: AI COMMANDS */}
+            {/* SECTION 3: AI COMMANDS (FROM OLD GUIDE) */}
             <section>
                 <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-3 mt-6">
-                    3. Kommandon till Utvecklaren (AI)
+                    3. Kommandon till AI-utvecklaren
                 </h4>
                 <div className="space-y-4">
                     <div className="bg-slate-900/50 p-3 rounded">
                         <div className="text-xs font-bold text-slate-400 mb-2">PRESTANDA-CHECK</div>
-                        <code className="block bg-black/20 p-3 rounded text-xs text-green-400 font-mono select-all">
-                            "Analysera 'Tower.tsx' och 'SubtitleOverlay.tsx'. Sker det onödiga omritningar? Vi kör nu Buffer 4096, håller synken?"
+                        <code className="block bg-black/20 p-3 rounded text-xs text-green-400 font-mono select-all cursor-pointer">
+                            "Analysera 'Tower.tsx' och 'SubtitleOverlay.tsx'. Sker det onödiga omritningar (re-renders)? Används useMemo korrekt?"
+                        </code>
+                    </div>
+                    <div className="bg-slate-900/50 p-3 rounded">
+                        <div className="text-xs font-bold text-slate-400 mb-2">RACE CONDITIONS</div>
+                        <code className="block bg-black/20 p-3 rounded text-xs text-green-400 font-mono select-all cursor-pointer">
+                            "Granska 'useGeminiSession'. Finns risk att vi anropar en stängd WebSocket vid snabb PÅ/AV?"
                         </code>
                     </div>
                 </div>

@@ -3,7 +3,21 @@ import { useState, useEffect } from 'react';
 import { VAD_CONFIG } from '../utils/vadLogic';
 
 export function useLiveConfig() {
-    const [targetLanguages, setTargetLanguages] = useState<string[]>(['Svenska']);
+    // UPDATED: Start empty, load from localStorage
+    const [targetLanguages, setTargetLanguages] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('app_target_languages');
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            return [];
+        }
+    });
+
+    // Save languages whenever they change
+    useEffect(() => {
+        localStorage.setItem('app_target_languages', JSON.stringify(targetLanguages));
+    }, [targetLanguages]);
+
     const [currentRoom, setCurrentRoom] = useState("Stora salen");
     
     // Configurable Parameters
@@ -29,6 +43,13 @@ export function useLiveConfig() {
     // DEVICE SELECTION
     const [inputDeviceId, setInputDeviceId] = useState<string>('default');
     const [outputDeviceId, setOutputDeviceId] = useState<string>('default');
+    
+    // NEW: PRO MODE (Disable Software Processing for DSP Hardware like Tesira)
+    const [enableProMode, setEnableProMode] = useState<boolean>(false);
+
+    // NEW: TRANSCRIPTION TOGGLE (Logic vs Visual)
+    // If false, model will not send text, only audio.
+    const [isTranscriptionEnabled, setIsTranscriptionEnabled] = useState<boolean>(true);
 
     const [debugMode, setDebugMode] = useState<boolean>(false);
     
@@ -84,6 +105,8 @@ export function useLiveConfig() {
         // Devices
         inputDeviceId, setInputDeviceId,
         outputDeviceId, setOutputDeviceId,
+        enableProMode, setEnableProMode,
+        isTranscriptionEnabled, setIsTranscriptionEnabled,
 
         debugMode, setDebugMode,
         activeMode, setActiveMode,

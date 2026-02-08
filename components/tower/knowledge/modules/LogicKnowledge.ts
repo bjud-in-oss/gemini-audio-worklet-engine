@@ -10,8 +10,9 @@ export const LOGIC_DOC: ModuleDoc = {
         { abbr: 'SPK', full: 'Speaking State', desc: 'JA/NEJ. Är användaren aktiv?' },
         { abbr: 'SIL', full: 'Active Silence Limit', desc: 'Den dynamiska gränsen för tystnad (påverkas av TTT).' },
         { abbr: 'GHOST', full: 'Ghost Pressure', desc: 'Är användaren i "Monolog-läge" (Momentum)?' },
+        { abbr: 'PUP', full: 'Puppeteer', desc: 'Regissören. Skickar osynliga textkommandon vid tystnad.' },
         { abbr: 'SQZ', full: 'The Squeeze', desc: 'Tidsbaserad nöd-sänkning av SIL.' },
-        { abbr: 'SHLD', full: 'The Shield', desc: 'Blockerar sändning när AI tänker/talar.' },
+        { abbr: 'SHLD', full: 'The Shield', desc: 'Buffrar sändning när AI tänker/talar (Blockerar ej mic).' },
         { abbr: 'DAM', full: 'Dam Pressure', desc: 'Mängd ljud i utgående kö (påverkar TTT).' },
         { abbr: 'JIT', full: 'Jitter Pressure', desc: 'Mängd ljud i inkommande kö (påverkar TTT).' },
         { abbr: 'BSY', full: 'Busy Timer', desc: 'Nedräkning för skölden.' },
@@ -24,16 +25,16 @@ export const LOGIC_DOC: ModuleDoc = {
 export const LOGIC_ENTRIES: Record<string, KnowledgeEntry> = {
     'SHLD': {
         title: 'The Shield (Barge-in Skydd)',
-        text: 'Systemets viktigaste försvarsmekanism. När skölden är LÅST (Röd) är sändaren (TX) fysiskt bortkopplad från nätverket.\n\nLOGIK:\n• Aktiveras vid: Användaren slutar prata ("Turn Complete").\n• Faller vid: AI skickar "Turn Complete" ELLER Busy-timern löper ut.',
+        text: 'Systemets viktigaste försvarsmekanism. När skölden är LÅST (Röd) buffras allt ljud i "The Dam".\n\nOBS: Den kopplar ALDRIG bort mikrofonen fysiskt. Inget ljud går förlorat, det bara fördröjs tills AI:n lyssnat klart.',
         good: 'ÖPPEN',
         tags: ['LOGIC'],
-        affects: [{id: 'DAM', desc: 'Stänger porten'}, {id: 'TX', desc: 'Blockerar'}],
+        affects: [{id: 'DAM', desc: 'Stänger porten'}, {id: 'TX', desc: 'Pausar sändning'}],
         affectedBy: [{id: 'BSY', desc: 'Styrs av'}, {id: 'RX', desc: 'Förlänger'}],
         x: 65, y: 30
     },
     'DAM': {
-        title: 'The Dam (Nätverksbuffert)',
-        text: 'Kön för **färdiga paket** (Base64) som väntar på att skickas. Detta är INTE samma sak som BUF.\n\nOm Skölden är uppe, samlas dina ord här ("Däms upp"). Så fort Skölden faller, spolas hela Dammen iväg till Google som en "Burst".',
+        title: 'The Dam (Uppdämt Ljud)',
+        text: 'Kön för **färdiga paket** (Base64) som väntar på att skickas. \n\nNär SHLD är aktiv, fylls denna buffert. När SHLD faller (AI:n tystnar), "spolas" hela bufferten iväg omedelbart. Detta gör att AI:n får hela din mening, men med en liten fördröjning.',
         good: '0',
         tags: ['NET'],
         affects: [{id: 'SIL', desc: 'Ökar (Double)'}, {id: 'SQZ', desc: 'Startar'}],
@@ -99,9 +100,18 @@ export const LOGIC_ENTRIES: Record<string, KnowledgeEntry> = {
         text: 'Tid i tystnad. Om denna överstiger den aktiva toleransen (som styrs av TTT + Squeeze), anser vi att turen är klar och aktiverar Skölden.', 
         good: 'Låg', 
         tags: ['LOGIC'],
-        affects: [{ id: 'BSY', desc: 'Startar' }],
+        affects: [{ id: 'BSY', desc: 'Startar' }, { id: 'PUP', desc: 'Triggar' }],
         affectedBy: [{ id: 'SPK', desc: 'Reset' }],
         x: 45, y: 50
+    },
+    'PUP': {
+        title: 'Puppeteer (Regissören)',
+        text: 'Osynlig logik som skickar textkommandon till AI:n vid lång tystnad. (Se Modul 37)\n\n1.5s -> [CMD: REPEAT_LAST]\n3.0s -> [CMD: FILLER "Hmm..."]\n5.0s -> HARD STOP.\n\nFörhindrar att AI:n hittar på slut eller svarar för snabbt.',
+        good: 'Aktiv vid tystnad',
+        tags: ['LOGIC', 'AI'],
+        affects: [{ id: 'TX', desc: 'Skickar text' }],
+        affectedBy: [{ id: 'SIL', desc: 'Triggas av' }],
+        x: 35, y: 60
     },
     'GAP': { 
         title: 'Jitter Buffer Gap', 

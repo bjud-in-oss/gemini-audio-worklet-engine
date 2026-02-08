@@ -17,6 +17,7 @@ const ID_MAP: Record<string, keyof DiagnosticData | string> = {
     'SPK': 'isSpeaking',
     'SIL': 'silenceDuration',
     'SQZ': 'currentSilenceThreshold',
+    'PUP': 'puppeteerState', // NEW
     
     // Config (Active values)
     'C_THR': 'vadThreshold',
@@ -80,6 +81,12 @@ const LiveValue = ({ id, propKey }: { id: string, propKey: string }) => {
                 } else if (typeof rawVal === 'string') {
                     displayVal = rawVal;
                     if (rawVal === 'OPEN' || rawVal === 'running') colorClass = 'text-green-400';
+                    if (propKey === 'puppeteerState') {
+                        if (rawVal === 'REPEAT') colorClass = 'text-blue-400 animate-pulse font-bold';
+                        else if (rawVal === 'FILLER') colorClass = 'text-fuchsia-400 animate-pulse font-bold';
+                        else if (rawVal === 'CUT') colorClass = 'text-red-500 animate-pulse font-black';
+                        else if (rawVal === 'IDLE') colorClass = 'text-slate-600';
+                    }
                 } else if (typeof rawVal === 'boolean') {
                     if (propKey === 'shieldActive') {
                         displayVal = rawVal ? 'LÅST' : 'ÖPPEN';

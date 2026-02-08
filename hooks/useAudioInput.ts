@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { TurnPackage } from '../types';
 import { createPcmBlob } from '../utils/audioUtils';
+import { INPUT_WORKLET_CODE, VAD_WORKER_CODE } from '../utils/workerScripts';
 
 interface UseAudioInputProps {
     activeMode: 'translate' | 'pause' | 'off';
@@ -26,200 +27,14 @@ interface UseAudioInputProps {
     // NEW: Hydraulic Props
     bufferGap: number; 
     shieldBufferRef: React.MutableRefObject<string[]>;
-}
-
-// --- INPUT PROCESSOR WORKLET (Embedded) ---
-// Replaces ScriptProcessorNode. Buffers 4096 samples to match VAD expectations.
-const INPUT_WORKLET_CODE = `
-class InputProcessor extends AudioWorkletProcessor {
-    constructor() {
-        super();
-        this.bufferSize = 4096;
-        this.buffer = new Float32Array(this.bufferSize);
-        this.writeIndex = 0;
-    }
-
-    process(inputs, outputs, parameters) {
-        const input = inputs[0];
-        if (input && input.length > 0) {
-            const channelData = input[0];
-            // Accumulate samples
-            for (let i = 0; i < channelData.length; i++) {
-                this.buffer[this.writeIndex++] = channelData[i];
-                if (this.writeIndex >= this.bufferSize) {
-                    // Flush buffer to main thread
-                    this.port.postMessage(this.buffer.slice());
-                    this.writeIndex = 0;
-                }
-            }
-        }
-        return true;
-    }
-}
-registerProcessor('input-processor', InputProcessor);
-`;
-
-// --- VAD WORKER CODE (Unchanged) ---
-const VAD_WORKER_CODE = `
-function calculateRMS(data) {
-    let sum = 0;
-    for(let i=0; i<data.length; i++) sum += data[i] * data[i];
-    return Math.sqrt(sum / data.length);
-}
-
-class NeuralVad {
-    constructor() {
-        this.session = null;
-        this.ort = null;
-        this.h = null;
-        this.c = null;
-        this.sr = null;
-        this.isReady = false;
-        this.loadFailed = false;
-        this.init();
-    }
-
-    async init() {
-        try {
-            let ortModule;
-            try {
-                ortModule = await import('https://esm.sh/onnxruntime-web@1.19.0');
-                this.ort = ortModule.default || ortModule;
-            } catch (importErr) {
-                console.warn("[NeuralVad] Failed to load ONNX Runtime from CDN.", importErr);
-                this.loadFailed = true;
-                return;
-            }
-
-            if (this.ort && this.ort.env) {
-                this.ort.env.wasm.wasmPaths = {
-                    'ort-wasm.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.0/dist/ort-wasm.wasm',
-                    'ort-wasm-simd.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.0/dist/ort-wasm-simd.wasm',
-                    'ort-wasm-threaded.wasm': 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.0/dist/ort-wasm-threaded.wasm'
-                };
-            }
-            
-            const modelUrls = [
-                "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.7/dist/silero_vad.onnx",
-                "https://cdn.jsdelivr.net/gh/snakers4/silero-vad@v4.0.0/files/silero_vad.onnx"
-            ];
-
-            let modelBuffer = null;
-
-            for (const url of modelUrls) {
-                try {
-                    const response = await fetch(url);
-                    if (response.ok) {
-                        modelBuffer = await response.arrayBuffer();
-                        break;
-                    } 
-                } catch (fetchErr) {}
-            }
-
-            if (!modelBuffer) {
-                console.error("[NeuralVad] All model sources failed.");
-                this.loadFailed = true;
-                return;
-            }
-
-            this.session = await this.ort.InferenceSession.create(modelBuffer, {
-                executionProviders: ['wasm'],
-                graphOptimizationLevel: 'all'
-            });
-            
-            const zeros = new Float32Array(2 * 1 * 64).fill(0);
-            this.h = new this.ort.Tensor('float32', zeros, [2, 1, 64]);
-            this.c = new this.ort.Tensor('float32', zeros, [2, 1, 64]);
-            this.sr = new this.ort.Tensor('int64', new BigInt64Array([16000n]));
-            
-            this.isReady = true;
-        } catch (e) {
-            console.error("[NeuralVad] Critical Init Error:", e);
-            this.loadFailed = true; 
-        }
-    }
-
-    async process(audioFrame) {
-        if (this.loadFailed || !this.isReady) {
-            let sum = 0;
-            for(let i=0; i<audioFrame.length; i++) sum += audioFrame[i] * audioFrame[i];
-            const rms = Math.sqrt(sum / audioFrame.length);
-            return rms > 0.01 ? 0.8 : 0; 
-        }
-
-        if (!this.session || !this.h || !this.c || !this.sr) return 0;
-
-        try {
-            const windowSize = 512;
-            let maxProb = 0;
-
-            for (let i = 0; i < audioFrame.length; i += windowSize) {
-                let chunk = audioFrame.slice(i, i + windowSize);
-                if (chunk.length < windowSize) {
-                    const padded = new Float32Array(windowSize);
-                    padded.set(chunk);
-                    chunk = padded;
-                }
-
-                const inputTensor = new this.ort.Tensor('float32', chunk, [1, windowSize]);
-
-                const feeds = { input: inputTensor, sr: this.sr, h: this.h, c: this.c };
-                const results = await this.session.run(feeds);
-
-                this.h = results.hn;
-                this.c = results.cn;
-
-                const output = results.output.data[0];
-                if (output > maxProb) maxProb = output;
-            }
-            return maxProb;
-        } catch (e) {
-            this.loadFailed = true;
-            return 0;
-        }
-    }
     
-    reset() {
-        if (this.isReady && this.ort) {
-            const zeros = new Float32Array(2 * 1 * 64).fill(0);
-            this.h = new this.ort.Tensor('float32', zeros, [2, 1, 64]);
-            this.c = new this.ort.Tensor('float32', zeros, [2, 1, 64]);
-        }
-    }
+    // NEW: PRO MODE
+    enableProMode: boolean;
+
+    // NEW: PUPPETEER PROTOCOL
+    sendTextSignal: (text: string) => void;
+    targetLanguage: string;
 }
-
-const vad = new NeuralVad();
-
-self.onmessage = async (e) => {
-    const { command, data, gain } = e.data;
-
-    if (command === 'PROCESS') {
-        const inputFrame = new Float32Array(data);
-        const processedFrame = new Float32Array(inputFrame.length);
-        const g = typeof gain === 'number' ? gain : 1.0;
-        
-        for(let i=0; i<inputFrame.length; i++) {
-            processedFrame[i] = inputFrame[i] * g;
-        }
-
-        const rms = calculateRMS(processedFrame);
-        let prob = 0;
-
-        if (rms > 0.002) {
-            prob = await vad.process(processedFrame);
-        }
-
-        self.postMessage({ 
-            command: 'RESULT', 
-            chunk: processedFrame, 
-            prob, 
-            rms 
-        }, [processedFrame.buffer]);
-    } else if (command === 'RESET') {
-        vad.reset();
-    }
-};
-`;
 
 export function useAudioInput({
     activeMode,
@@ -239,7 +54,10 @@ export function useAudioInput({
     debugMode,
     audioDiagnosticsRef,
     bufferGap,
-    shieldBufferRef
+    shieldBufferRef,
+    enableProMode,
+    sendTextSignal,
+    targetLanguage
 }: UseAudioInputProps) {
     
     const [effectiveMinDuration, setEffectiveMinDuration] = useState(minTurnDuration);
@@ -270,6 +88,11 @@ export function useAudioInput({
     
     const bufferGapRef = useRef(bufferGap);
     
+    // PUPPETEER REFS
+    const silenceTimerRef = useRef<any>(null);
+    const silenceStageRef = useRef<number>(0); 
+    const currentTargetLangRef = useRef(targetLanguage);
+
     const isSpeakingRef = useRef(false);
     const speechStartTimeRef = useRef(0);
     const silenceStartTimeRef = useRef(0);
@@ -285,6 +108,7 @@ export function useAudioInput({
     useEffect(() => { momentumStartRef.current = momentumStart; }, [momentumStart]);
     useEffect(() => { ghostToleranceRef.current = ghostTolerance; }, [ghostTolerance]);
     useEffect(() => { bufferGapRef.current = bufferGap; }, [bufferGap]);
+    useEffect(() => { currentTargetLangRef.current = targetLanguage; }, [targetLanguage]);
 
     const flushTurn = useCallback(() => {
         if (pcmBufferRef.current.length === 0) return;
@@ -346,20 +170,66 @@ export function useAudioInput({
         const isSpeech = prob > activeThreshold;
         
         if (isSpeech) {
+            // --- SPEECH DETECTED ---
+            
+            // KILL PUPPETEER TIMER
+            if (silenceTimerRef.current) {
+                clearInterval(silenceTimerRef.current);
+                silenceTimerRef.current = null;
+            }
+            silenceStageRef.current = 0;
+            
+            // UPDATE DIAGNOSTICS: IDLE
+            if(audioDiagnosticsRef.current) audioDiagnosticsRef.current.puppeteerState = 'IDLE';
+
             if (!isSpeakingRef.current) {
                 isSpeakingRef.current = true;
                 speechStartTimeRef.current = now;
             }
             silenceStartTimeRef.current = 0;
         } else {
+            // --- SILENCE DETECTED ---
             if (isSpeakingRef.current) {
                 if (silenceStartTimeRef.current === 0) {
                     silenceStartTimeRef.current = now;
+                    
+                    // START PUPPETEER TIMER
+                    if (silenceTimerRef.current) clearInterval(silenceTimerRef.current);
+                    
+                    silenceTimerRef.current = setInterval(() => {
+                        const elapsed = Date.now() - silenceStartTimeRef.current;
+
+                        // STAGE 1: REPEAT (1.5s)
+                        if (elapsed > 1500 && silenceStageRef.current === 0) {
+                            sendTextSignal('[CMD: REPEAT_LAST]'); 
+                            silenceStageRef.current = 1;
+                            if(audioDiagnosticsRef.current) audioDiagnosticsRef.current.puppeteerState = 'REPEAT';
+                        }
+
+                        // STAGE 2: FILLER (3.0s)
+                        if (elapsed > 3000 && silenceStageRef.current === 1) {
+                            const isSwedish = currentTargetLangRef.current.toLowerCase().includes('svenska');
+                            const filler = isSwedish ? "Låt se..." : "Let me see...";
+                            sendTextSignal(`[CMD: FILLER "${filler}"]`);
+                            silenceStageRef.current = 2;
+                            if(audioDiagnosticsRef.current) audioDiagnosticsRef.current.puppeteerState = 'FILLER';
+                        }
+                        
+                        // STAGE 3: HARD CUT (5.0s)
+                        if (elapsed > 5000) {
+                            if (silenceTimerRef.current) clearInterval(silenceTimerRef.current);
+                            // Force flush
+                            isSpeakingRef.current = false;
+                            flushTurn();
+                            if(audioDiagnosticsRef.current) audioDiagnosticsRef.current.puppeteerState = 'CUT';
+                        }
+
+                    }, 500);
                 }
                 
                 const speechDurationSec = (now - speechStartTimeRef.current) / 1000;
                 
-                // Hard Flush Safety
+                // Hard Flush Safety (25s)
                 if (speechDurationSec > 25.0) {
                     console.log("[AudioInput] ⚠️ Hard Flushing due to >25s speech duration.");
                     isSpeakingRef.current = false;
@@ -406,6 +276,9 @@ export function useAudioInput({
                 }
 
                 if (now - silenceStartTimeRef.current > currentSilenceThresh) {
+                    // Normal finish via Hydraulics
+                    if (silenceTimerRef.current) clearInterval(silenceTimerRef.current);
+                    if (audioDiagnosticsRef.current) audioDiagnosticsRef.current.puppeteerState = 'IDLE'; // Reset visually
                     isSpeakingRef.current = false;
                     flushTurn();
                 }
@@ -423,7 +296,7 @@ export function useAudioInput({
                  onAudioData(pcmBlob.data); 
              }
         }
-    }, [busyUntilRef, audioDiagnosticsRef, flushTurn, onAudioData, shieldBufferRef]);
+    }, [busyUntilRef, audioDiagnosticsRef, flushTurn, onAudioData, shieldBufferRef, sendTextSignal]);
 
     const latestHandlerRef = useRef(handleWorkerResult);
     
@@ -479,16 +352,29 @@ export function useAudioInput({
             // Load Worklet
             await ctx.audioWorklet.addModule(inputWorkletBlobUrlRef.current!);
 
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
+            // PRO MODE: If enabled, disable all software processing to let Hardware (DSP/Tesira) handle it.
+            // If disabled (Default), use standard browser echo cancellation.
+            const constraints: MediaTrackConstraints = enableProMode 
+                ? {
+                    deviceId: inputDeviceId !== 'default' ? { exact: inputDeviceId } : undefined,
+                    channelCount: 1,
+                    sampleRate: 16000,
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false
+                  }
+                : {
                     deviceId: inputDeviceId !== 'default' ? { exact: inputDeviceId } : undefined,
                     channelCount: 1,
                     sampleRate: 16000,
                     echoCancellation: true,
                     noiseSuppression: true,
                     autoGainControl: true
-                }
-            });
+                  };
+
+            console.log(`[AudioInput] Requesting Mic with ProMode=${enableProMode}`, constraints);
+
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: constraints });
             streamRef.current = stream;
 
             const source = ctx.createMediaStreamSource(stream);
@@ -523,9 +409,15 @@ export function useAudioInput({
             console.error("Audio Input Init Failed:", e);
             throw e;
         }
-    }, [inputDeviceId, audioDiagnosticsRef]);
+    }, [inputDeviceId, audioDiagnosticsRef, enableProMode]);
 
     const stopAudioInput = useCallback(() => {
+        // KILL TIMER
+        if (silenceTimerRef.current) {
+            clearInterval(silenceTimerRef.current);
+            silenceTimerRef.current = null;
+        }
+
         if (workletNodeRef.current) {
             workletNodeRef.current.disconnect();
             workletNodeRef.current.port.onmessage = null;

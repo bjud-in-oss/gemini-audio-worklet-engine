@@ -11,92 +11,82 @@ export const CONFIG_DOC: ModuleDoc = {
         { abbr: 'C_LAT', full: 'Config Latency', desc: 'Minsta taltid (Buffertstorlek).' },
         { abbr: 'C_CSL', full: 'Config Cold Start', desc: 'Antal turer i "Safe Mode".' },
         { abbr: 'C_VOL', full: 'Config Volume', desc: 'Digital förstärkning (Gain).' },
-        { abbr: 'C_MSD', full: 'Config Min Speech', desc: 'Kortaste ljudet att reagera på.' },
-        { abbr: 'C_MOM', full: 'Momentum Start', desc: 'Tid för att aktivera Ghost Pressure.' },
-        { abbr: 'C_MTR', full: 'Momentum Tolerance', desc: 'Tolerans i ms vid aktivt Momentum.' }
+        { abbr: 'C_MSD', full: 'Config Min Speech', desc: 'Kortaste ljud som räknas som tal.' },
+        { abbr: 'C_TXT', full: 'Transcription State', desc: 'Styr om vi beställer text från servern.' }
     ]
 };
 
 export const CONFIG_ENTRIES: Record<string, KnowledgeEntry> = {
-    'C_THR': {
-        title: 'C_THR: Bruskänslighet',
-        text: 'Bestämmer hur säker (0.0-1.0) den neurala VAD-modellen måste vara för att öppna mikrofonen.\n\n• Högt värde (0.8): Filtrerar bort fläktar och sorl, men kan klippa svaga röster.\n• Lågt värde (0.3): Fångar viskningar, men riskerar att sända bakgrundsbrus.',
-        good: '0.5 - 0.7',
-        tags: ['AI'], 
-        affects: [{id: 'THR', desc: 'Styr'}],
-        affectedBy: [],
-        x: 10, y: 10
+    'C_THR': { 
+        title: 'VAD Threshold (Känslighet)', 
+        text: 'Bestämmer hur högt "ljudtryck" (RMS+Prob) som krävs för att mikrofonen ska öppnas.\n\n• Lågt värde (0.2): Fångar viskningar, men riskerar att fånga fläktbrus.\n• Högt värde (0.8): Kräver tydlig röst, men kan klippa början på meningar.', 
+        good: '0.5-0.6', 
+        tags:['CONFIG', 'AI'], 
+        affects: [{ id: 'THR', desc: 'Sätter nivå' }], 
+        affectedBy: [], 
+        x: 15, y: 15 
     },
-    'C_SIL': {
-        title: 'C_SIL: Paus-tolerans (Taket)',
-        text: 'Detta är INTE längre en statisk gräns. C_SIL anger nu **Maximal Tolerans** (Taket) som används i "Trull-läget" (vid långa monologer eller högt tryck i Dammen).\n\nI snabb dialog ("Tripp") ignorerar vi ofta detta värde och kör hårt på 275ms för maximal responsivitet.',
-        good: '500ms',
-        tags: ['LOGIC'],
-        affects: [{id: 'SIL', desc: 'Maxgräns'}],
-        affectedBy: [],
-        x: 10, y: 30
+    'C_SIL': { 
+        title: 'Max Silence (Taket)', 
+        text: 'Det maximala värdet för hur länge vi väntar på tystnad innan vi skickar.\n\nDetta är INTE den aktiva toleransen, utan det tak som "Trull"-läget får gå upp till vid monolog. Vid dialog används alltid BASE_SIL (275ms).', 
+        good: '500-1200ms', 
+        tags:['CONFIG', 'LOGIC'], 
+        affects: [{ id: 'SIL', desc: 'Sätter gräns' }], 
+        affectedBy: [], 
+        x: 35, y: 55 
     },
-    'C_ELA': {
-        title: 'C_ELA: Monolog-gräns',
-        text: 'Tidsgränsen (sekunder) för när vi byter från "Dialog" till "Monolog".\n\nEfter denna tid börjar systemet sänka toleransen mjukt. Vid 20s tar dock "The Aggressive Squeeze" över oavsett vad detta värde är satt till.',
-        good: '5.0s',
-        tags: ['LOGIC'],
-        affects: [{id: 'SQZ', desc: 'Startar'}],
-        affectedBy: [],
-        x: 10, y: 40
+    'C_ELA': { 
+        title: 'Elasticity Start', 
+        text: 'Tidsgränsen (sekunder) för när "Ghost Pressure" aktiveras.\n\nOm du pratar längre än detta värde, anser systemet att du håller en monolog och ökar tystnadstoleransen för att inte avbryta dig vid andningspauser.', 
+        good: '3.0s', 
+        tags:['CONFIG', 'LOGIC'], 
+        affects: [{ id: 'GHOST', desc: 'Triggar' }], 
+        affectedBy: [], 
+        x: 25, y: 45 
     },
-    'C_LAT': {
-        title: 'C_LAT: Start-buffert',
-        text: 'Minsta mängd ljud (ms) som måste samlas in innan vi skickar det första paketet. Fungerar som ett skydd mot att skicka "Eh..." eller klickljud.',
-        good: '600ms',
-        tags: ['LOGIC'],
-        affects: [{id: 'BUF', desc: 'Håller data'}],
-        affectedBy: [],
-        x: 10, y: 60
+    'C_LAT': { 
+        title: 'Min Latency (Turn Duration)', 
+        text: 'Minsta mängd ljud (ms) vi måste samla in innan vi ens FÅR skicka det till servern.\n\nEtt högre värde ger stabilare VAD men ökar fördröjningen. Ett lägre värde ger snabbare svar men kan hacka upp meningar.', 
+        good: '600ms', 
+        tags:['CONFIG', 'NET'], 
+        affects: [{ id: 'BUF', desc: 'Gränsvärde' }], 
+        affectedBy: [], 
+        x: 70, y: 70 
     },
-    'C_CSL': {
-        title: 'C_CSL: Cold Start Limit',
-        text: 'Antal turer i början av ett samtal där vi kör "SAFE MODE".\n\nI Safe Mode gissar vi konservativt (lång väntetid) på hur länge AI:n tänker. När gränsen är nådd byter vi till "ADAPTIVE MODE" och baserar väntetiden på verklig uppmätt RTT.',
-        good: '5 turer',
-        tags: ['AI'],
-        affects: [{id: 'CS_M', desc: 'Styr läge'}],
-        affectedBy: [],
-        x: 65, y: 55
+    'C_CSL': { 
+        title: 'Cold Start Limit', 
+        text: 'Antal turer i början av ett samtal där vi kör "SAFE MODE".\n\nI början har vi ingen data om hur snabb nätverkskopplingen är (RTT). Därför använder vi extra stora säkerhetsmarginaler för Skölden de första 5 turerna.', 
+        good: '5 turer', 
+        tags:['CONFIG', 'AI'], 
+        affects: [{ id: 'CS_M', desc: 'Styr' }], 
+        affectedBy: [], 
+        x: 80, y: 35 
     },
-    'C_VOL': {
-        title: 'C_VOL: Input Gain',
-        text: 'Digital volymökning. Multiplicerar mikrofonens signalstyrka INNAN den når VAD. Användbart om talaren står långt bort.',
-        good: '1.0x',
-        tags: ['AUDIO'],
-        affects: [{id: 'RMS', desc: 'Boostar'}],
-        affectedBy: [],
-        x: 10, y: 80
+    'C_VOL': { 
+        title: 'Digital Gain (Volume)', 
+        text: 'Mjukvaruförstärkning av mikrofonen INNAN den når VAD-analysen.\n\nAnvänds om den fysiska mikrofonen är för svag. OBS: Förstärker även bakgrundsbrus.', 
+        good: '1.0x', 
+        tags:['CONFIG', 'AUDIO'], 
+        affects: [{ id: 'RMS', desc: 'Ökar signal' }], 
+        affectedBy: [], 
+        x: 10, y: 80 
     },
     'C_MSD': {
-        title: 'C_MSD: Min Speech',
-        text: 'Filter för korta ljud. Om ett ljud är kortare än detta (t.ex. en hostning) kastas det bort helt och VAD triggas aldrig.',
+        title: 'Min Speech Duration',
+        text: 'Kortaste ljudimpuls som räknas som tal.\n\nFiltrerar bort korta klickljud eller enstaka hostningar. Om VAD är aktiv kortare än detta (t.ex. 150ms) kastas ljudet bort.',
         good: '150ms',
-        tags: ['AI'],
-        affects: [{id: 'SPK', desc: 'Veto'}],
+        tags: ['CONFIG', 'AI'],
+        affects: [{ id: 'SPK', desc: 'Filter' }],
         affectedBy: [],
-        x: 10, y: 20
+        x: 25, y: 25
     },
-    'C_MOM': {
-        title: 'C_MOM: Momentum Start',
-        text: 'Tidsgränsen (sek) där vi anser att användaren "fått upp farten" (Momentum). Efter denna tid aktiveras "Ghost Pressure" vilket tillåter längre pauser.',
-        good: '3.0s',
-        tags: ['LOGIC'],
-        affects: [{id: 'GHOST', desc: 'Aktiverar'}],
+    'C_TXT': {
+        title: 'Transcription Toggle',
+        text: 'Bestämmer om vi skickar "outputAudioTranscription" i sessions-konfigurationen.\n\n• PÅ: Vi får både ljud och text. Bandbreddskrävande.\n• AV: Vi får enbart ljud. Sparar data och sänker latens marginellt.\n\nÄndring slår igenom vid nästa anslutning.',
+        good: 'Valfritt',
+        tags: ['CONFIG', 'NET'],
+        affects: [{ id: 'RX', desc: 'Datatyp' }],
         affectedBy: [],
-        x: 25, y: 45
-    },
-    'C_MTR': {
-        title: 'C_MTR: Momentum Tolerance',
-        text: 'Toleransvärdet (ms) för tystnad när Momentum är aktivt. Detta är den "Gyllene Medelvägen" (1200ms) som tillåter andningspauser men fortfarande klipper lagom snabbt.',
-        good: '1200ms',
-        tags: ['LOGIC'],
-        affects: [{id: 'SIL', desc: 'Målvärde'}],
-        affectedBy: [],
-        x: 45, y: 45
+        x: 90, y: 10
     }
 };

@@ -9,7 +9,8 @@ const Modality = GenAIModule.Modality || (GenAIModule as any).default?.Modality 
 
 export const ExtendedStatus = {
     ...ConnectionStatus,
-    STANDBY: 'standby'
+    STANDBY: 'standby',
+    RECOVERING: 'recovering'
 } as const;
 
 export type ExtendedStatusType = typeof ExtendedStatus[keyof typeof ExtendedStatus];
@@ -18,6 +19,7 @@ interface SessionConfig {
     apiKey?: string;
     systemInstruction: string;
     voiceName?: string;
+    enableTranscription?: boolean; // NEW PROP
 }
 
 interface SessionCallbacks {
@@ -64,12 +66,18 @@ export function useGeminiSession(callbacks: SessionCallbacks) {
         const myConnectionId = Date.now();
         connectionIdRef.current = myConnectionId;
 
-        setStatus(ExtendedStatus.CONNECTING);
+        if (isRetry) {
+            setStatus(ExtendedStatus.RECOVERING);
+        } else {
+            setStatus(ExtendedStatus.CONNECTING);
+        }
         activeRef.current = true;
 
         try {
             const ai = new GoogleGenAI({ apiKey: config.apiKey });
             
+            // DYNAMIC CONFIGURATION
+            // Only add outputAudioTranscription if enabled
             const sessionConfig = {
                 model: 'gemini-2.5-flash-native-audio-preview-12-2025',
                 config: {
@@ -77,10 +85,12 @@ export function useGeminiSession(callbacks: SessionCallbacks) {
                   speechConfig: { 
                       voiceConfig: { prebuiltVoiceConfig: { voiceName: config.voiceName || 'Puck' } } 
                   },
-                  outputAudioTranscription: {}, 
-                  systemInstruction: config.systemInstruction
+                  systemInstruction: config.systemInstruction,
+                  ...(config.enableTranscription !== false ? { outputAudioTranscription: {} } : {})
                 },
             };
+
+            console.log(`[Session] Config: Transcriptions=${config.enableTranscription !== false}`);
 
             const sessionPromise = ai.live.connect({
                 ...sessionConfig,
@@ -133,7 +143,7 @@ export function useGeminiSession(callbacks: SessionCallbacks) {
                         // FAIL-SAFE: If connection dies, assume turn is complete to DROP THE SHIELD
                         callbacks.onTurnComplete(); 
 
-                        if (activeRef.current && status !== ExtendedStatus.STANDBY) {
+                        if (activeRef.current && status !== ExtendedStatus.STANDBY && status !== ExtendedStatus.RECOVERING) {
                             setStatus(ExtendedStatus.DISCONNECTED);
                             callbacks.onDisconnect();
                         }
@@ -141,14 +151,14 @@ export function useGeminiSession(callbacks: SessionCallbacks) {
                     onerror: (e: any) => {
                         if (connectionIdRef.current !== myConnectionId) return;
 
-                        const msg = e.message || String(e);
-                        console.error(`[Session ${myConnectionId}] ❌ Error:`, msg);
+                        const msg = (e.message || String(e)).toLowerCase();
                         
                         // FAIL-SAFE: Error means streaming stopped. Drop shield.
                         callbacks.onTurnComplete();
 
                         // Treat "Operation is not implemented" as a fatal error instead of ignoring it
-                        if (msg.includes("Operation is not implemented") || msg.includes("not supported")) {
+                        if (msg.includes("operation is not implemented") || msg.includes("not supported")) {
+                            console.error(`[Session ${myConnectionId}] ❌ Fatal Error:`, msg);
                             setStatus(ExtendedStatus.ERROR);
                             callbacks.onError("Modellfel: Funktionen stöds ej. (Not Implemented)");
                             return; 
@@ -158,19 +168,21 @@ export function useGeminiSession(callbacks: SessionCallbacks) {
                         if (
                             msg.includes("unavailable") || 
                             msg.includes("503") || 
-                            msg.includes("Internal error") ||
-                            msg.includes("Network error") ||
+                            msg.includes("internal error") ||
+                            msg.includes("network error") ||
                             msg.includes("aborted") || 
-                            msg.includes("Failed to fetch") || 
+                            msg.includes("failed to fetch") || 
                             msg.includes("capacity") ||
                             msg.includes("429")
                         ) {
                              const backoffDelay = Math.min(1000 * Math.pow(1.5, retryCountRef.current), 15000);
                              retryCountRef.current += 1;
 
-                             console.warn(`[Session] Transient error (${msg}), retrying in ${backoffDelay}ms... (Attempt ${retryCountRef.current})`);
+                             // Suppress ERROR log for retriable errors, use WARN instead
+                             console.warn(`[Session ${myConnectionId}] ⚠️ Transient error (${msg}), retrying in ${backoffDelay}ms... (Attempt ${retryCountRef.current})`);
                              
                              if (activeRef.current) {
+                                 setStatus(ExtendedStatus.RECOVERING);
                                  try { sessionRef.current?.close(); } catch(err) {}
                                  sessionRef.current = null;
                                  retryTimeoutRef.current = setTimeout(() => connect(config, true), backoffDelay);
@@ -178,6 +190,8 @@ export function useGeminiSession(callbacks: SessionCallbacks) {
                              return;
                         }
                         
+                        // Log actual error if not transient
+                        console.error(`[Session ${myConnectionId}] ❌ Error:`, msg);
                         setStatus(ExtendedStatus.ERROR);
                         callbacks.onError("Anslutningsfel: " + msg);
                     }
@@ -201,25 +215,25 @@ export function useGeminiSession(callbacks: SessionCallbacks) {
         } catch (e: any) {
             if (connectionIdRef.current !== myConnectionId) return;
 
-            console.error("[Session] Connection Failed immediately", e);
-            
             // Check for network error on immediate failure too
-            const msg = e.message || String(e);
+            const msg = (e.message || String(e)).toLowerCase();
             
             // Immediate retry for specific startup errors
             if (activeRef.current && (
-                msg.includes("Network error") || 
-                msg.includes("Failed to fetch") ||
+                msg.includes("network error") || 
+                msg.includes("failed to fetch") ||
                 msg.includes("aborted") ||
                 msg.includes("unavailable")
             )) {
                 const backoffDelay = Math.min(1000 * Math.pow(1.5, retryCountRef.current), 10000);
                 retryCountRef.current += 1;
-                console.warn(`[Session] Immediate error, retrying in ${backoffDelay}ms...`, msg);
+                console.warn(`[Session] Immediate startup error (${msg}), retrying in ${backoffDelay}ms...`);
+                setStatus(ExtendedStatus.RECOVERING);
                 retryTimeoutRef.current = setTimeout(() => connect(config, true), backoffDelay);
                 return;
             }
 
+            console.error("[Session] Connection Failed immediately", e);
             setStatus(ExtendedStatus.DISCONNECTED);
             callbacks.onError(e.message);
         }
@@ -285,6 +299,28 @@ export function useGeminiSession(callbacks: SessionCallbacks) {
         }
     }, []);
 
+    // NEW: Send Arbitrary Text Signals (Puppeteer Protocol)
+    const sendTextSignal = useCallback((text: string) => {
+        if (sessionRef.current) {
+            try {
+                // This format forces the model to treat the text as "User Input"
+                // and respond immediately due to turnComplete: true
+                sessionRef.current.send({
+                    clientContent: {
+                        turns: [{
+                            role: 'user',
+                            parts: [{ text: text }]
+                        }],
+                        turnComplete: true
+                    }
+                });
+                console.log(`%c[Puppeteer] 📨 Signal sent: ${text}`, "color: fuchsia; font-weight: bold;");
+            } catch (e) {
+                console.error("Signal failed", e);
+            }
+        }
+    }, []);
+
     const setStandby = useCallback(() => {
         if (sessionRef.current) {
             try { sessionRef.current.close(); } catch(e) {}
@@ -298,7 +334,8 @@ export function useGeminiSession(callbacks: SessionCallbacks) {
         connect,
         disconnect,
         sendAudio,
-        sendEndTurn, // Exported
+        sendEndTurn,
+        sendTextSignal, // Exported
         setStandby,
         isActive: activeRef.current
     };

@@ -1,103 +1,6 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react';
-
-// --- OUTPUT AUDIO PROCESSOR WORKLET (Embedded) ---
-// Handles Ring Buffer and Elastic Time Stretching via MessagePort (No SharedArrayBuffer)
-// This ensures compatibility with environments missing COOP/COEP headers.
-const OUTPUT_WORKLET_CODE = `
-class AudioProcessor extends AudioWorkletProcessor {
-  constructor() {
-    super();
-    // Internal Ring Buffer (30 seconds capacity)
-    this.bufferSize = 24000 * 30; 
-    this.buffer = new Float32Array(this.bufferSize);
-    this.writeIndex = 0;
-    this.readIndex = 0;
-    
-    // Config
-    this.SAMPLE_RATE = 24000;
-    this.TARGET_LATENCY_FRAMES = 24000 * 0.25; // 250ms target latency
-    
-    // Status reporting throttling
-    this.framesSinceLastReport = 0;
-
-    this.port.onmessage = this.handleMessage.bind(this);
-  }
-
-  handleMessage(event) {
-    const { type, data } = event.data;
-    if (type === 'PUSH') {
-       this.push(data);
-    }
-  }
-
-  push(chunk) {
-    // Simple Ring Buffer Write
-    // Note: chunk is Float32Array
-    const len = chunk.length;
-    for (let i = 0; i < len; i++) {
-        this.buffer[this.writeIndex % this.bufferSize] = chunk[i];
-        this.writeIndex++;
-    }
-  }
-
-  process(inputs, outputs) {
-    const outputChannel = outputs[0][0];
-    const outputLength = outputChannel.length;
-    
-    // Calculate Fill Level (Available Samples)
-    // JS numbers are doubles (safe integer limit ~9 quadrillion), so simple subtraction works fine for years.
-    let available = this.writeIndex - Math.floor(this.readIndex);
-    
-    // Report status periodically (~100ms)
-    this.framesSinceLastReport += outputLength;
-    if (this.framesSinceLastReport > 2400) { 
-        this.port.postMessage({
-            type: 'STATUS',
-            samples: available,
-            ms: (available / this.SAMPLE_RATE) * 1000
-        });
-        this.framesSinceLastReport = 0;
-    }
-
-    if (available < outputLength) {
-        // Underrun - output silence
-        for (let i = 0; i < outputLength; i++) outputChannel[i] = 0;
-        return true;
-    }
-
-    // Elastic Rate Logic
-    // If buffer grows too large, speed up slightly to drain it (Catch-up)
-    let speed = 1.0;
-    if (available > this.TARGET_LATENCY_FRAMES) {
-        // Cap speed increase at +15% to avoid chipmunk effect
-        const excess = available - this.TARGET_LATENCY_FRAMES;
-        const boost = Math.min(0.15, (excess / 24000) * 0.5);
-        speed += boost;
-    }
-
-    // Read Loop with Linear Interpolation
-    for (let i = 0; i < outputLength; i++) {
-        const idx = this.readIndex;
-        const idxFloor = Math.floor(idx);
-        const idxCeil = idxFloor + 1;
-        const frac = idx - idxFloor;
-
-        const s0 = this.buffer[idxFloor % this.bufferSize];
-        const s1 = this.buffer[idxCeil % this.bufferSize];
-        
-        // Lerp
-        const val = s0 + (s1 - s0) * frac;
-
-        outputChannel[i] = val;
-        this.readIndex += speed;
-    }
-
-    return true;
-  }
-}
-registerProcessor('audio-processor', AudioProcessor);
-`;
+import { OUTPUT_WORKLET_CODE } from '../utils/workerScripts';
 
 const SAMPLE_RATE = 24000;
 
@@ -106,15 +9,17 @@ interface AudioEngineState {
     audioContext: AudioContext | null;
 }
 
+// GLOBAL REF SINGLETON
+// This ensures that regardless of closure scope or re-renders,
+// everyone reads the exact same buffer status.
+const globalBufferStatus = { samples: 0, ms: 0, speed: 1.0, active: true };
+
 export function useAudioEngine() {
     const [state, setState] = useState<AudioEngineState>({ isReady: false, audioContext: null });
     
     const audioCtxRef = useRef<AudioContext | null>(null);
     const workletNodeRef = useRef<AudioWorkletNode | null>(null);
     const workletBlobUrlRef = useRef<string | null>(null);
-    
-    // Buffer Status (Updated via messages from worklet)
-    const bufferStatusRef = useRef({ samples: 0, ms: 0 });
 
     const initAudio = useCallback(async () => {
         if (audioCtxRef.current) return;
@@ -138,8 +43,31 @@ export function useAudioEngine() {
             
             // Listen for status updates from the audio thread
             workletNode.port.onmessage = (e) => {
-                if (e.data.type === 'STATUS') {
-                    bufferStatusRef.current = { samples: e.data.samples, ms: e.data.ms };
+                const msg = e.data;
+                
+                if (msg.type === 'STATUS') {
+                    // Update the global singleton
+                    globalBufferStatus.samples = msg.samples;
+                    globalBufferStatus.ms = msg.ms;
+                    globalBufferStatus.speed = msg.speed || 1.0;
+                } 
+                else if (msg.type === 'VOICE_STOP') {
+                    // ECO MODE: Suspend context to save battery
+                    if (ctx.state === 'running') {
+                        console.log("[AudioEngine] 🌙 Idle detected. Suspending to save battery.");
+                        ctx.suspend().then(() => {
+                            globalBufferStatus.active = false;
+                        });
+                    }
+                }
+                else if (msg.type === 'VOICE_START') {
+                    // WAKE UP: Resume context
+                    if (ctx.state === 'suspended') {
+                        console.log("[AudioEngine] ☀️ Voice detected. Waking up.");
+                        ctx.resume().then(() => {
+                            globalBufferStatus.active = true;
+                        });
+                    }
                 }
             };
 
@@ -154,8 +82,14 @@ export function useAudioEngine() {
         }
     }, []);
 
-    const pushPCM = useCallback((base64Data: string) => {
+    const pushPCM = useCallback(async (base64Data: string) => {
         if (!workletNodeRef.current) return;
+
+        // WAKE UP: Ensure engine is running before we push data
+        if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+            await audioCtxRef.current.resume();
+            globalBufferStatus.active = true;
+        }
 
         // 1. Decode Base64 -> Float32
         const binaryString = atob(base64Data);
@@ -180,13 +114,15 @@ export function useAudioEngine() {
 
     }, []);
 
+    // Directly return the global object reference
     const getBufferStatus = useCallback(() => {
-        return bufferStatusRef.current;
+        return globalBufferStatus;
     }, []);
 
     const resumeContext = useCallback(async () => {
         if (audioCtxRef.current?.state === 'suspended') {
             await audioCtxRef.current.resume();
+            globalBufferStatus.active = true;
         }
     }, []);
 
@@ -196,6 +132,7 @@ export function useAudioEngine() {
             if (workletBlobUrlRef.current) {
                 URL.revokeObjectURL(workletBlobUrlRef.current);
             }
+            // Note: We don't nullify globalBufferStatus here to prevent read errors on unmount
             audioCtxRef.current?.close().catch(e => console.warn("Context close warning:", e));
         };
     }, []);

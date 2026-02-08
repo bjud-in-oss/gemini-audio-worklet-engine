@@ -26,6 +26,31 @@ import CodeArchaeology from './knowledge/23_CodeArchaeology';
 import TheStuckCounter from './knowledge/24_TheStuckCounter';
 import CleanBreakDeepDive from './knowledge/25_CleanBreakDeepDive';
 import GhostPressureDeepDive from './knowledge/26_GhostPressureDeepDive';
+import AudioEnginePotential from './knowledge/27_AudioEnginePotential';
+import HardwareIntegration from './knowledge/28_HardwareIntegration';
+import AudioMixingScenarios from './knowledge/29_AudioMixingScenarios';
+import MasterWiringGuide from './knowledge/30_MasterWiringGuide';
+import VirtualCableGuide from './knowledge/31_VirtualCableGuide';
+import SimpleJabraGuide from './knowledge/32_SimpleJabraGuide';
+import UniversalAutomation from './knowledge/33_UniversalAutomation';
+import LongDurationStrategy from './knowledge/34_LongDurationStrategy';
+import TotalSystemCritique from './knowledge/35_TotalSystemCritique';
+import AudioDistribution from './knowledge/36_AudioDistribution';
+import PuppeteerProtocol from './knowledge/37_PuppeteerProtocol';
+import TheTapeRecorderProtocol from './knowledge/38_TheTapeRecorderProtocol';
+import PromptSimplification from './knowledge/39_PromptSimplification';
+import ShieldPunctureDeepDive from './knowledge/40_ShieldPunctureDeepDive';
+import VisualDebuggingFix from './knowledge/41_VisualDebuggingFix';
+import HybridSpeedControl from './knowledge/42_HybridSpeedControl';
+import AdaptiveSlew from './knowledge/43_AdaptiveSlew';
+import TowerUnification from './knowledge/44_TowerUnification';
+import PipeliningDeepDive from './knowledge/45_PipeliningDeepDive';
+import TheBlindSpotDeepDive from './knowledge/46_TheBlindSpotDeepDive';
+import WakeUpProtocol from './knowledge/47_WakeUpProtocol';
+import DynamicPersonaInjection from './knowledge/48_DynamicPersonaInjection';
+import EcoMode from './knowledge/49_EcoMode';
+import HybridVelocity from './knowledge/50_HybridVelocity';
+import PromptEngineering from './knowledge/51_PromptEngineering';
 
 interface TowerOverviewProps {
     onClose: () => void;
@@ -67,6 +92,48 @@ const TowerOverview: React.FC<TowerOverviewProps> = ({ onClose, highlightedId })
                 {/* PROTOCOLS */}
                 <CleanBreakDeepDive />
                 <GhostPressureDeepDive />
+                
+                {/* FUTURE DEV */}
+                <AudioEnginePotential />
+                <HardwareIntegration />
+                <AudioMixingScenarios />
+                
+                {/* THE MASTER GUIDES */}
+                <MasterWiringGuide />
+                <VirtualCableGuide />
+                <SimpleJabraGuide />
+                <UniversalAutomation />
+                <LongDurationStrategy />
+                
+                {/* THE DISTRIBUTION & CRITIQUE */}
+                <TotalSystemCritique />
+                <AudioDistribution />
+                
+                {/* THE PUPPETEER & NEW PROTOCOLS */}
+                <PuppeteerProtocol />
+                <TheTapeRecorderProtocol />
+                <PromptSimplification />
+                
+                {/* CRITICAL BUG FIXES & ENGINE UPDATES */}
+                <ShieldPunctureDeepDive />
+                <VisualDebuggingFix />
+                <HybridSpeedControl />
+                <AdaptiveSlew />
+                <TowerUnification />
+                <PipeliningDeepDive />
+                <TheBlindSpotDeepDive />
+                <WakeUpProtocol />
+                <DynamicPersonaInjection />
+                <EcoMode />
+                <HybridVelocity />
+                
+                {/* PROMPT & LANGUAGE */}
+                <PromptEngineering />
+            </div>
+            
+            {/* End Marker to confirm scroll reach */}
+            <div className="flex items-center justify-center pt-8 opacity-30 pb-8">
+                <div className="h-1 w-20 bg-slate-700 rounded-full"></div>
             </div>
         </div>
     );

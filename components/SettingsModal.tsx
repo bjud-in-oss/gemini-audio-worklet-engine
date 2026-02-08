@@ -35,6 +35,10 @@ interface SettingsModalProps {
   setInputDeviceId?: (val: string) => void;
   outputDeviceId?: string;
   setOutputDeviceId?: (val: string) => void;
+  
+  // NEW: Speaking Rate
+  aiSpeakingRate: number;
+  setAiSpeakingRate: (val: number) => void;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
@@ -54,7 +58,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   inputDeviceId,
   setInputDeviceId,
   outputDeviceId,
-  setOutputDeviceId
+  setOutputDeviceId,
+  aiSpeakingRate,
+  setAiSpeakingRate
 }) => {
   return (
     <div 
@@ -103,6 +109,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 setInputDeviceId={setInputDeviceId}
                 outputDeviceId={outputDeviceId}
                 setOutputDeviceId={setOutputDeviceId}
+                aiSpeakingRate={aiSpeakingRate}
+                setAiSpeakingRate={setAiSpeakingRate}
               />
 
               <RealtimeDiagnostics 

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { useGeminiLive } from './hooks/useGeminiLive';
-import { useWakeLock } from './hooks/useWakeLock';
+import { useGeminiLive } from '../hooks/useGeminiLive';
+import { useWakeLock } from '../hooks/useWakeLock';
 import { SubtitleOverlay } from './components/SubtitleOverlay';
 import OnboardingModal from './components/OnboardingModal';
 import HeaderControls from './components/HeaderControls';
@@ -195,7 +195,9 @@ const App: React.FC = () => {
         customSystemInstruction={customSystemInstruction}
         setCustomSystemInstruction={setCustomSystemInstruction}
         targetLanguages={targetLanguages}
+        onLanguagesChange={handleSaveLanguages}
         aiSpeakingRate={aiSpeakingRate}
+        allLanguages={ALL_LANGUAGES}
       />
 
       {/* 3. NOTIFICATION LAYER */}
@@ -220,7 +222,6 @@ const App: React.FC = () => {
       <div 
         className={`flex-1 w-full relative z-10 flex flex-col transition-opacity duration-700 ease-in-out ${showSubtitles ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
       >
-          {/* Note: We pass activePhraseTiming which might be null now, handled by ActiveItem */}
           <SubtitleOverlay 
             activeGroup={activeGroup}
             activePhraseTiming={activePhraseTiming}

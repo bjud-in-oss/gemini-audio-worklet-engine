@@ -86,9 +86,18 @@ export function useLiveDiagnostics() {
     }, []);
 
     // 3. TURN COMPLETE (Signal)
-    const trackTurnComplete = useCallback(() => {
-        // AI signals it is done. Drop shield immediately.
-        busyUntilRef.current = 0; 
+    // MODIFIED FOR BUG 40: Now accepts 'shouldDropShield'
+    const trackTurnComplete = useCallback((shouldDropShield: boolean = true) => {
+        // Only drop shield if the caller (GeminiLive hook) says the buffer is empty
+        if (shouldDropShield) {
+            busyUntilRef.current = 0; 
+        } else {
+            // If buffer is full, we keep the shield alive.
+            // The Hydraulic Latch in useGeminiLive will manage it from here.
+            if ((window as any).APP_LOGS_ENABLED) {
+                console.log("[Diagnostics] TurnComplete received, but Shield kept UP due to Buffer Pressure.");
+            }
+        }
         
         // ACTIVATE ZOMBIE PROTECTION: Prevent late packets from raising the shield again
         isAiTurnCompleteRef.current = true;

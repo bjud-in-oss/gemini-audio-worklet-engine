@@ -3,6 +3,7 @@ import React, { forwardRef } from 'react';
 import { LayerProps } from './types';
 // LogicGraph moved to Tower.tsx
 import LogicMetrics, { LogicMetricsRefs } from './logic/LogicMetrics';
+import { QueueStats } from '../../types';
 
 interface LogicLayerProps extends LayerProps {
     vadThreshold: number; setVadThreshold: (val: number) => void;
@@ -16,6 +17,13 @@ interface LogicLayerProps extends LayerProps {
     // NEW GHOST PROPS
     momentumStart: number; setMomentumStart: (val: number) => void;
     ghostTolerance: number; setGhostTolerance: (val: number) => void;
+
+    // NEW: AI Speaking Rate
+    aiSpeakingRate: number; setAiSpeakingRate: (val: number) => void;
+    
+    // NEW: Stats for Tri-Velocity
+    queueStats?: QueueStats;
+    currentPlaybackRate?: number;
 }
 
 export interface LogicLayerRefs extends LogicMetricsRefs {
@@ -33,7 +41,10 @@ const LogicLayer = forwardRef<LogicLayerRefs, LogicLayerProps>(({
     coldStartSamples, setColdStartSamples,
     momentumStart, setMomentumStart,
     ghostTolerance, setGhostTolerance,
-    highlightMap
+    aiSpeakingRate, setAiSpeakingRate,
+    highlightMap,
+    queueStats,
+    currentPlaybackRate
 }, ref) => {
     return (
         <div className="bg-slate-900/40 border-b border-emerald-500/20 pb-2 space-y-2">
@@ -52,7 +63,11 @@ const LogicLayer = forwardRef<LogicLayerRefs, LogicLayerProps>(({
                 coldStartSamples={coldStartSamples} setColdStartSamples={setColdStartSamples}
                 momentumStart={momentumStart} setMomentumStart={setMomentumStart}
                 ghostTolerance={ghostTolerance} setGhostTolerance={setGhostTolerance}
+                aiSpeakingRate={aiSpeakingRate} setAiSpeakingRate={setAiSpeakingRate}
                 highlightMap={highlightMap}
+                
+                queueStats={queueStats}
+                currentPlaybackRate={currentPlaybackRate}
             />
         </div>
     );

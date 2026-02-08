@@ -1,9 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useGeminiLive } from './hooks/useGeminiLive';
 import { useWakeLock } from './hooks/useWakeLock';
 import { SubtitleOverlay } from './components/SubtitleOverlay';
-import OnboardingModal from './components/OnboardingModal';
 import HeaderControls from './components/HeaderControls';
 import CalibrationModal from './components/CalibrationModal';
 import LanguageSelectorModal from './components/LanguageSelectorModal';
@@ -13,7 +12,94 @@ import SystemPromptModal from './components/SystemPromptModal';
 import { AudioGroup } from './types';
 
 const ALL_LANGUAGES = [
-  "Afrikaans", "Albanska", "Amhariska", "Arabiska", "Armeniska", "Azerbajdzjanska", "Baskiska", "Vitryska", "Bengali", "Bosniska", "Bulgariska", "Katalanska", "Cebuano", "Kinesiska (Förenklad)", "Kinesiska (Traditionell)", "Korsikanska", "Kroatiska", "Tjeckiska", "Danska", "Nederländska", "Engelska", "Esperanto", "Estniska", "Finska", "Franska", "Frisiska", "Galiciska", "Georgiska", "Tyska", "Grekiska", "Gujarati", "Haitisk kreol", "Hausa", "Hawaiiska", "Hebreiska", "Hindi", "Hmong", "Ungerska", "Isländska", "Igbo", "Indonesiska", "Irländska", "Italienska", "Japanska", "Javanesiska", "Kannada", "Kazakiska", "Khmer", "Koreanska", "Kurdiska", "Kirgiziska", "Lao", "Latin", "Lettiska", "Litauiska", "Luxemburgska", "Makedonska", "Madagaskiska", "Malajiska", "Malayalam", "Maltesiska", "Maori", "Marathi", "Mongoliska", "Burmesiska", "Nepalesiska", "Norska", "Nyanja", "Pashto", "Persiska", "Polska", "Portugisiska", "Punjabi", "Rumänska", "Ryska", "Samoanska", "Skotsk gäliska", "Serbiska", "Sesotho", "Shona", "Sindhi", "Singalesiska", "Slovakiska", "Slovenska", "Somaliska", "Spanska", "Sundanesiska", "Swahili", "Svenska", "Tagalog (Filipino)", "Tadzjikiska", "Tamil", "Telugu", "Thailändska", "Turkiska", "Ukrainska", "Urdu", "Uzbekiska", "Vietnamesiska", "Walesiska", "Xhosa", "Jiddisch", "Yoruba", "Zulu"
+  "Afrikaans",
+  "Azərbaycan (Azerbajdzjanska)",
+  "Bahasa Indonesia",
+  "Bahasa Melayu",
+  "Basa Jawa (Javanesiska)",
+  "Bosanski (Bosniska)",
+  "Català (Katalanska)",
+  "Čeština (Tjeckiska)",
+  "Cymraeg (Walesiska)",
+  "Dansk (Danska)",
+  "Deutsch (Tyska)",
+  "Eesti (Estniska)",
+  "English (Engelska)",
+  "Español (Spanska)",
+  "Esperanto",
+  "Euskara (Baskiska)",
+  "Filipino (Tagalog)",
+  "Français (Franska)",
+  "Frysk (Frisiska)",
+  "Gaeilge (Irländska)",
+  "Gàidhlig (Skotsk gäliska)",
+  "Galego (Galiciska)",
+  "Hausa",
+  "Hrvatski (Kroatiska)",
+  "Igbo",
+  "Íslenska (Isländska)",
+  "Italiano (Italienska)",
+  "Kinyarwanda",
+  "Kiswahili (Swahili)",
+  "Latviešu (Lettiska)",
+  "Lietuvių (Litauiska)",
+  "Lëtzebuergesch (Luxemburgska)",
+  "Magyar (Ungerska)",
+  "Malti (Maltesiska)",
+  "Māori",
+  "Nederlands (Nederländska)",
+  "Norsk (Norska)",
+  "O‘zbek (Uzbekiska)",
+  "Polski (Polska)",
+  "Português (Portugisiska)",
+  "Română (Rumänska)",
+  "Shqip (Albanska)",
+  "Slovenčina (Slovakiska)",
+  "Slovenščina (Slovenska)",
+  "Soomaali (Somaliska)",
+  "Suomi (Finska)",
+  "Svenska",
+  "Tiếng Việt (Vietnamesiska)",
+  "Türkçe (Turkiska)",
+  "Yorùbá",
+  "Zulu",
+  "Ελληνικά (Grekiska)",
+  "Беларуская (Vitryska)",
+  "Български (Bulgariska)",
+  "Кыргызча (Kirgiziska)",
+  "Македонски (Makedonska)",
+  "Монгол (Mongoliska)",
+  "Русский (Ryska)",
+  "Српски (Serbiska)",
+  "Тоҷикӣ (Tadzjikiska)",
+  "Українська (Ukrainska)",
+  "Қазақ тілі (Kazakiska)",
+  "Հայերեն (Armeniska)",
+  "עברית (Hebreiska)",
+  "ייִדיש (Jiddisch)",
+  "اردو (Urdu)",
+  "العربية (Arabiska)",
+  "فارسی (Persiska)",
+  "پښتو (Pashto)",
+  "नेपाली (Nepalesiska)",
+  "मराठी (Marathi)",
+  "हिन्दी (Hindi)",
+  "বাংলা (Bengali)",
+  "ਪੰਜਾਬੀ (Punjabi)",
+  "ગુજરાતી (Gujarati)",
+  "தமிழ் (Tamil)",
+  "తెలుగు (Telugu)",
+  "ಕನ್ನಡ (Kannada)",
+  "മലയാളം (Malayalam)",
+  "සිංහල (Singalesiska)",
+  "ไทย (Thailändska)",
+  "ພາສາລາວ (Lao)",
+  "ဗမာစာ (Burmesiska)",
+  "ខ្មែរ (Khmer)",
+  "한국어 (Koreanska)",
+  "中文 (Kinesiska)",
+  "日本語 (Japanska)",
+  "አማርኛ (Amhariska)"
 ];
 
 const LOCAL_MODE_NAME = "Lokalt i min mobil";
@@ -89,7 +175,17 @@ const App: React.FC = () => {
     setCustomSystemInstruction, 
     enableLogs, 
     setEnableLogs,
-    simulateNetworkDrop 
+    simulateNetworkDrop,
+    getBufferStatus,
+    isJitterEnabled,
+    setIsJitterEnabled,
+    jitterIntensity,
+    setJitterIntensity,
+    // ADDED: Pro Mode & Transcription Configs
+    enableProMode,
+    setEnableProMode,
+    isTranscriptionEnabled,
+    setIsTranscriptionEnabled
   } = useGeminiLive();
 
   useEffect(() => {
@@ -105,17 +201,21 @@ const App: React.FC = () => {
   const [showPromptModal, setShowPromptModal] = useState(false); 
   const [showSubtitles, setShowSubtitles] = useState(true);
 
+  // NEW: Track if we have ever connected to show subtitles button permanently after first use
+  const [hasEverConnected, setHasEverConnected] = useState(false);
+
+  useEffect(() => {
+      if (status === 'connected') {
+          setHasEverConnected(true);
+      }
+  }, [status]);
+
   const handleSaveLanguages = (langs: string[]) => setTargetLanguages(langs);
-  const handleOnboardingComplete = (lang: string) => setTargetLanguages([lang]);
 
   const handleRoomChange = (room: string) => {
       setCurrentRoom(room);
-      if (room !== LOCAL_MODE_NAME && targetLanguages.length > 1) {
-          setTargetLanguages([targetLanguages[0]]);
-      }
   };
 
-  // --- PERSISTENT ACTIVE ITEM LOGIC (Linger Effect) ---
   const [lastActiveGroupId, setLastActiveGroupId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -124,7 +224,6 @@ const App: React.FC = () => {
       }
   }, [activePhraseTiming]);
 
-  // If audio is playing, use that ID. If not, fallback to the last known ID.
   const effectiveActiveGroupId = activePhraseTiming?.groupId ?? lastActiveGroupId;
 
   const activeItem = effectiveActiveGroupId !== null 
@@ -147,30 +246,38 @@ const App: React.FC = () => {
     .sort((a, b) => a.groupId - b.groupId)
     .map(t => ({ id: t.id, text: t.text }));
 
+  // Helper to determine if we have a valid language set
+  const hasLanguages = targetLanguages.length > 0 && targetLanguages[0] !== '';
+
   return (
     <div className="h-screen w-screen bg-[#101010] text-white overflow-hidden font-sans relative flex flex-col items-center justify-center">
       
-      {/* 1. BACKGROUND LAYER (Simpler, darker gradient) */}
       <div className="absolute inset-0 bg-gradient-to-b from-[#1a1a1a] to-[#050505] z-0"></div>
       
-      {/* 2. MODAL LAYER */}
-      <OnboardingModal 
-        allLanguages={ALL_LANGUAGES} 
-        onComplete={handleOnboardingComplete} 
+      {/* HEADER CONTROLS (Handles Hero Animation internally) */}
+      <HeaderControls 
+          currentRoom={currentRoom}
+          onRoomChange={handleRoomChange}
+          userLanguage={targetLanguages.length > 1 ? `${targetLanguages.length} Språk` : targetLanguages[0] || 'Välj'}
+          targetLanguages={targetLanguages}
+          allLanguages={ALL_LANGUAGES}
+          onOpenLangModal={() => setShowLangModal(true)}
+          onCloseLangModal={() => setShowLangModal(false)}
+          isLangModalOpen={showLangModal} // PASSED HERE
+          onOpenSettings={() => setDebugMode(true)} 
+          status={status}
+          isTranscriptionEnabled={isTranscriptionEnabled}
+          setIsTranscriptionEnabled={setIsTranscriptionEnabled}
+          showSubtitles={showSubtitles}
+          onToggleSubtitles={() => setShowSubtitles(!showSubtitles)}
+          currentPlaybackRate={currentPlaybackRate}
+          inputDeviceId={inputDeviceId}
+          setInputDeviceId={setInputDeviceId}
+          outputDeviceId={outputDeviceId}
+          setOutputDeviceId={setOutputDeviceId}
+          onToggleTower={() => setDebugMode(!debugMode)}
+          hasEverConnected={hasEverConnected}
       />
-
-      <div className="absolute top-0 left-0 w-full z-50">
-        <HeaderControls 
-            currentRoom={currentRoom}
-            onRoomChange={handleRoomChange}
-            userLanguage={targetLanguages.length > 1 ? `${targetLanguages.length} Språk` : targetLanguages[0] || 'Välj'}
-            onOpenLangModal={() => setShowLangModal(true)}
-            onToggleTower={() => setDebugMode(!debugMode)} 
-            status={status}
-            showSubtitles={showSubtitles}
-            onToggleSubtitles={() => setShowSubtitles(!showSubtitles)}
-        />
-      </div>
 
       <LanguageSelectorModal 
         isOpen={showLangModal}
@@ -178,7 +285,7 @@ const App: React.FC = () => {
         onSave={handleSaveLanguages}
         currentLanguages={targetLanguages} 
         allLanguages={ALL_LANGUAGES}
-        isSingleSelection={currentRoom !== LOCAL_MODE_NAME}
+        isSingleSelection={false}
       />
 
       {showCalibrationModal && (
@@ -195,10 +302,11 @@ const App: React.FC = () => {
         customSystemInstruction={customSystemInstruction}
         setCustomSystemInstruction={setCustomSystemInstruction}
         targetLanguages={targetLanguages}
+        onLanguagesChange={handleSaveLanguages}
         aiSpeakingRate={aiSpeakingRate}
+        allLanguages={ALL_LANGUAGES}
       />
 
-      {/* 3. NOTIFICATION LAYER */}
       {notification && (
           <div className="absolute top-24 left-1/2 transform -translate-x-1/2 bg-neutral-800/80 border border-neutral-700 px-4 py-2 rounded-full backdrop-blur-md z-30 animate-in fade-in slide-in-from-top-4 duration-200">
               <p className="text-neutral-300 text-xs font-mono flex items-center gap-2">
@@ -216,11 +324,9 @@ const App: React.FC = () => {
           </div>
       )}
 
-      {/* 4. MAIN CONTENT LAYER */}
       <div 
         className={`flex-1 w-full relative z-10 flex flex-col transition-opacity duration-700 ease-in-out ${showSubtitles ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
       >
-          {/* Note: We pass activePhraseTiming which might be null now, handled by ActiveItem */}
           <SubtitleOverlay 
             activeGroup={activeGroup}
             activePhraseTiming={activePhraseTiming}
@@ -230,7 +336,6 @@ const App: React.FC = () => {
           />
       </div>
       
-      {/* 5. DIAGNOSTICS LAYER */}
       {debugMode && (
           <Tower 
               diagnosticsRef={audioDiagnosticsRef} 
@@ -238,7 +343,6 @@ const App: React.FC = () => {
               triggerTestTone={triggerTestTone} 
               injectTextAsAudio={injectTextAsAudio}
               initAudioInput={initAudioInput} 
-              
               aiSpeakingRate={aiSpeakingRate}
               setAiSpeakingRate={setAiSpeakingRate}
               minTurnDuration={minTurnDuration}
@@ -247,54 +351,53 @@ const App: React.FC = () => {
               setVadThreshold={setVadThreshold}
               silenceThreshold={silenceThreshold}
               setSilenceThreshold={setSilenceThreshold}
-              
               elasticityStart={elasticityStart}
               setElasticityStart={setElasticityStart}
               minSpeechDuration={minSpeechDuration}
               setMinSpeechDuration={setMinSpeechDuration}
-
               volMultiplier={volMultiplier}
               setVolMultiplier={setVolMultiplier}
-
-              // PASS DEVICES
               inputDeviceId={inputDeviceId}
               setInputDeviceId={setInputDeviceId}
               outputDeviceId={outputDeviceId}
               setOutputDeviceId={setOutputDeviceId}
-
-              // NEW: PASS CONFIGS TO TOWER
               coldStartSamples={coldStartSamples}
               setColdStartSamples={setColdStartSamples}
               autoSleepTimeout={autoSleepTimeout}
               setAutoSleepTimeout={setAutoSleepTimeout}
-              
-              // NEW: GHOST PROPS
               momentumStart={momentumStart}
               setMomentumStart={setMomentumStart}
               ghostTolerance={ghostTolerance}
               setGhostTolerance={setGhostTolerance}
-
               debugMode={debugMode}
               setDebugMode={setDebugMode}
               onOpenCalibration={() => setShowCalibrationModal(true)}
-
               connect={connect}
               disconnect={disconnect}
               setCustomSystemInstruction={setCustomSystemInstruction}
-
               enableLogs={enableLogs}
               setEnableLogs={setEnableLogs}
-              
               onOpenPromptModal={() => setShowPromptModal(true)}
-              
               simulateNetworkDrop={simulateNetworkDrop}
+              getBufferStatus={getBufferStatus}
+              isJitterEnabled={isJitterEnabled}
+              setIsJitterEnabled={setIsJitterEnabled}
+              jitterIntensity={jitterIntensity}
+              setJitterIntensity={setJitterIntensity}
+              queueStats={queueStats}
+              currentPlaybackRate={currentPlaybackRate}
+              enableProMode={enableProMode}
+              setEnableProMode={setEnableProMode}
           />
       )}
 
-      <ControlBar 
-        activeMode={activeMode}
-        setMode={setMode}
-      />
+      {/* ControlBar only visible if language selected */}
+      {hasLanguages && (
+          <ControlBar 
+            activeMode={activeMode}
+            setMode={setMode}
+          />
+      )}
     </div>
   );
 };

@@ -13,6 +13,7 @@ import TowerPhases, { TowerPhasesRefs } from './tower/TowerPhases';
 import LogicGraph from './tower/logic/LogicGraph';
 import { TowerProvider } from './tower/TowerContext';
 import { KNOWLEDGE_BASE } from './tower/TowerKnowledge';
+import { QueueStats } from '../types';
 
 interface TowerProps {
     diagnosticsRef: React.MutableRefObject<DiagnosticData>;
@@ -21,6 +22,10 @@ interface TowerProps {
     injectTextAsAudio: (text: string) => Promise<string>;
     initAudioInput: () => Promise<void>; 
     
+    // STATS
+    queueStats: QueueStats;
+    currentPlaybackRate: number;
+
     aiSpeakingRate: number;
     setAiSpeakingRate: (val: number) => void;
     minTurnDuration: number;
@@ -38,6 +43,12 @@ interface TowerProps {
     coldStartSamples: number;
     setColdStartSamples: (val: number) => void;
 
+    // NEW: GHOST PRESSURE PROPS
+    momentumStart: number;
+    setMomentumStart: (val: number) => void;
+    ghostTolerance: number;
+    setGhostTolerance: (val: number) => void;
+
     volMultiplier: number; 
     setVolMultiplier: (val: number) => void; 
     
@@ -48,6 +59,10 @@ interface TowerProps {
     setInputDeviceId?: (val: string) => void;
     outputDeviceId?: string;
     setOutputDeviceId?: (val: string) => void;
+    
+    // NEW: Pro Mode Toggle
+    enableProMode?: boolean;
+    setEnableProMode?: (val: boolean) => void;
 
     debugMode: boolean;
     setDebugMode: (val: boolean) => void;
@@ -62,6 +77,13 @@ interface TowerProps {
     onOpenPromptModal: () => void;
     
     simulateNetworkDrop: () => void; 
+
+    // ENGINE TOOLS
+    getBufferStatus?: () => { samples: number; ms: number; speed?: number };
+    isJitterEnabled?: boolean;
+    setIsJitterEnabled?: (val: boolean) => void;
+    jitterIntensity?: number;
+    setJitterIntensity?: (val: number) => void;
 }
 
 const Tower: React.FC<TowerProps> = ({ 
@@ -70,6 +92,8 @@ const Tower: React.FC<TowerProps> = ({
     triggerTestTone, 
     injectTextAsAudio,
     initAudioInput,
+    queueStats,
+    currentPlaybackRate,
     aiSpeakingRate, setAiSpeakingRate,
     minTurnDuration, setMinTurnDuration,
     vadThreshold, setVadThreshold,
@@ -77,20 +101,36 @@ const Tower: React.FC<TowerProps> = ({
     elasticityStart, setElasticityStart,
     minSpeechDuration, setMinSpeechDuration,
     coldStartSamples, setColdStartSamples,
+    momentumStart, setMomentumStart,
+    ghostTolerance, setGhostTolerance,
     volMultiplier, setVolMultiplier,
     autoSleepTimeout, setAutoSleepTimeout,
     inputDeviceId, setInputDeviceId, 
-    outputDeviceId, setOutputDeviceId, 
+    outputDeviceId, setOutputDeviceId,
+    enableProMode, setEnableProMode,
     debugMode, setDebugMode,
     onOpenCalibration,
     connect, disconnect,
     setCustomSystemInstruction,
     enableLogs, setEnableLogs,
     onOpenPromptModal,
-    simulateNetworkDrop
+    simulateNetworkDrop,
+    getBufferStatus,
+    isJitterEnabled,
+    setIsJitterEnabled,
+    jitterIntensity,
+    setJitterIntensity
 }) => {
     const [selectedInfo, setSelectedInfo] = useState<string | null>(null);
     const [visualsEnabled, setVisualsEnabled] = useState(true); 
+    
+    const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+        maintenance: true // Default collapsed
+    });
+
+    const toggleSection = (key: string) => {
+        setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }));
+    };
 
     const highlightMap = useMemo(() => {
         const map: Record<string, HighlightType> = {};
@@ -106,7 +146,7 @@ const Tower: React.FC<TowerProps> = ({
 
     const networkRefs = useRef<NetworkLayerRefs>({ wsRef: null, keyRef: null, txRef: null, rxRef: null });
     const audioRefs = useRef<AudioLayerRefs>({ rmsRef: null, srRef: null, ctxRef: null, framesRef: null, timeRef: null });
-    const logicRefs = useRef<LogicLayerRefs>({}); // Empty ref as we use IDs now
+    const logicRefs = useRef<LogicLayerRefs>({}); 
     
     const graphCanvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -125,6 +165,8 @@ const Tower: React.FC<TowerProps> = ({
         rxCounter: 0
     });
 
+    // ... (useEffect for render loop remains largely the same, omitted for brevity but assumed intact) ...
+    // Note: Ensuring we keep the existing render logic for VAD graph etc.
     useEffect(() => {
         if (!visualsEnabled) {
             if (graphCanvasRef.current) {
@@ -145,10 +187,8 @@ const Tower: React.FC<TowerProps> = ({
         const TARGET_FPS = 30; 
         const FRAME_INTERVAL = 1000 / TARGET_FPS;
 
-        // ELEMENT CACHE (To avoid getElementById every frame)
         let logicEls: Record<string, HTMLElement | null> = {};
 
-        // Helper to safely get element even if component re-renders (replacing DOM node)
         const getEl = (key: string, id: string) => {
             if (!logicEls[key] || !logicEls[key]?.isConnected) {
                 logicEls[key] = document.getElementById(id);
@@ -162,7 +202,7 @@ const Tower: React.FC<TowerProps> = ({
             const ring = el.querySelector('.active-ring');
             const icon = el.querySelector('.icon-container');
             const label = el.querySelector('.label-id');
-            const text = el.querySelector('.label-text');
+            const text = el.querySelector('.label-text') as HTMLElement | null;
             
             if (active) {
                 el.style.backgroundColor = 'rgba(30, 41, 59, 1)'; 
@@ -209,7 +249,6 @@ const Tower: React.FC<TowerProps> = ({
             if (net.rxRef) { net.rxRef.style.backgroundColor = data.serverRx ? '#22c55e' : '#1e293b'; net.rxRef.style.boxShadow = data.serverRx ? '0 0 8px #22c55e' : 'none'; }
             if (net.txRef) { net.txRef.style.backgroundColor = data.networkEvent !== 'idle' ? '#3b82f6' : '#1e293b'; }
             
-            // LOGIC LAYER UPDATES (Via direct ID Access for robustness)
             const vadEl = getEl('vad', 'disp-vad');
             if (vadEl) vadEl.innerText = (data.vadProb * 100).toFixed(0);
 
@@ -224,6 +263,23 @@ const Tower: React.FC<TowerProps> = ({
 
             const sqzEl = getEl('sqz', 'disp-sqz');
             if (sqzEl) { const thresh = data.currentSilenceThreshold || data.silenceThreshold || 500; sqzEl.innerText = (thresh/1000).toFixed(2) + 's'; if (thresh < 100) sqzEl.className = 'text-red-500 font-black text-xs animate-pulse bg-red-900/30 px-1 rounded'; else if (thresh < 400) sqzEl.className = 'text-orange-400 font-bold text-xs'; else sqzEl.className = 'text-green-400 font-mono text-xs'; }
+
+            const pupEl = getEl('pup', 'disp-pup');
+            if (pupEl) {
+                const state = data.puppeteerState || 'IDLE';
+                pupEl.innerText = state;
+                if (state === 'REPEAT') pupEl.className = 'text-blue-400 animate-pulse font-bold text-[10px] font-mono';
+                else if (state === 'FILLER') pupEl.className = 'text-fuchsia-400 animate-pulse font-bold text-[10px] font-mono';
+                else if (state === 'CUT') pupEl.className = 'text-red-500 animate-pulse font-black text-[10px] font-mono';
+                else pupEl.className = 'text-slate-500 font-bold text-[10px] font-mono';
+            }
+
+            const ghostEl = getEl('ghost', 'disp-ghost');
+            if (ghostEl) {
+                const active = data.ghostActive;
+                ghostEl.innerText = active ? "ON" : "OFF";
+                ghostEl.className = active ? "text-fuchsia-400 font-bold text-sm font-mono" : "text-slate-500 font-bold text-sm font-mono";
+            }
 
             const gapEl = getEl('gap', 'disp-gap');
             if (gapEl) { const gap = data.bufferGap || 0; gapEl.innerText = gap.toFixed(2) + 's'; gapEl.style.color = Math.abs(gap) > 0.5 ? '#facc15' : '#ffffff'; }
@@ -252,7 +308,6 @@ const Tower: React.FC<TowerProps> = ({
             const rttEl = getEl('rtt', 'disp-rtt');
             if (rttEl) { const rtt = data.rtt || 0; const rttAge = data.rttAge || 0; rttEl.innerText = rtt.toFixed(0) + 'ms'; if (rttAge > 5000) { rttEl.className = 'text-slate-600 font-bold text-base'; } else { rttEl.className = rtt > 1000 ? 'text-red-500 font-bold text-base' : 'text-emerald-400 font-bold text-base'; } }
 
-            // --- FIXED SHLD AND DAM UI (WITH STALE CHECK) ---
             const shldEl = getEl('shld', 'disp-shld');
             if (shldEl) {
                 const active = data.shieldActive;
@@ -272,7 +327,6 @@ const Tower: React.FC<TowerProps> = ({
                     : 'text-white text-sm font-mono leading-none mt-1 font-bold inline-block min-w-[20px] text-center';
             }
             
-            // INTERNAL MODEL REFS (Using IDs)
             const prateEl = getEl('prate', 'disp-prate');
             if (prateEl) prateEl.innerText = (data.modelProcessingRate || 1.0).toFixed(2);
             
@@ -362,12 +416,29 @@ const Tower: React.FC<TowerProps> = ({
         if (key === 'elasticityStart') setElasticityStart(val);
         if (key === 'minSpeechDuration') setMinSpeechDuration(val);
         if (key === 'autoSleepTimeout') setAutoSleepTimeout(val);
+        if (key === 'momentumStart') setMomentumStart(val);
+        if (key === 'ghostTolerance') setGhostTolerance(val);
+        if (key === 'coldStartSamples') setColdStartSamples(val);
     };
 
     const handleToggleConnection = (action: 'connect' | 'disconnect') => {
         if (action === 'connect') connect();
         else disconnect();
     };
+
+    const SectionHeader = ({ title, id, isOpen }: { title: string, id: string, isOpen: boolean }) => (
+        <div 
+            onClick={() => toggleSection(id)}
+            className="flex items-center justify-between cursor-pointer mb-2 group select-none hover:bg-slate-900/30 p-1 rounded transition-colors"
+        >
+            <div className="text-[10px] font-bold text-slate-500 uppercase group-hover:text-slate-300 transition-colors">
+                {title}
+            </div>
+            <div className="text-slate-600 text-[10px] font-mono group-hover:text-slate-400">
+                {isOpen ? '[-]' : '[+]'}
+            </div>
+        </div>
+    );
 
     return (
         <TowerProvider diagnosticsRef={diagnosticsRef}>
@@ -394,80 +465,108 @@ const Tower: React.FC<TowerProps> = ({
 
                             <div className="space-y-6">
                                 <div>
-                                    <div className="text-[10px] font-bold text-slate-500 uppercase mb-2">Nätverk</div>
-                                    <NetworkLayer 
-                                        ref={networkRefs} 
-                                        isConnected={isConnected} 
-                                        onExplain={handleDocsLinkClick} 
-                                        onHelp={() => {}} 
-                                        onClose={() => {}}
-                                        aiSpeakingRate={aiSpeakingRate}
-                                        setAiSpeakingRate={setAiSpeakingRate}
-                                        highlightMap={highlightMap}
-                                    />
+                                    <SectionHeader title="Globala Verktyg (Kontrollpanel)" id="tools" isOpen={!collapsedSections['tools']} />
+                                    {!collapsedSections['tools'] && (
+                                        <TowerSettings 
+                                            inputDeviceId={inputDeviceId} setInputDeviceId={setInputDeviceId}
+                                            outputDeviceId={outputDeviceId} setOutputDeviceId={setOutputDeviceId}
+                                            enableProMode={enableProMode} setEnableProMode={setEnableProMode}
+                                            debugMode={debugMode} setDebugMode={setDebugMode}
+                                            onOpenCalibration={onOpenCalibration}
+                                            onHelp={() => {}} onExplain={handleDocsLinkClick}
+                                            onClose={() => {}} highlightKey={selectedInfo}
+                                            enableLogs={enableLogs} setEnableLogs={setEnableLogs}
+                                            onOpenPromptModal={onOpenPromptModal}
+                                            visualsEnabled={visualsEnabled}
+                                            setVisualsEnabled={setVisualsEnabled}
+                                            // PASSING STATS BUT NOT RENDERING DASHBOARD HERE ANYMORE
+                                            queueStats={queueStats}
+                                            currentPlaybackRate={currentPlaybackRate}
+                                            // PASSING CONFIGS TO TOWER SETTINGS
+                                            aiSpeakingRate={aiSpeakingRate} setAiSpeakingRate={setAiSpeakingRate}
+                                            minTurnDuration={minTurnDuration} setMinTurnDuration={setMinTurnDuration}
+                                            vadThreshold={vadThreshold} setVadThreshold={setVadThreshold}
+                                        />
+                                    )}
+                                </div>
+
+                                <div>
+                                    <SectionHeader title="Nätverk" id="network" isOpen={!collapsedSections['network']} />
+                                    {!collapsedSections['network'] && (
+                                        <NetworkLayer 
+                                            ref={networkRefs} 
+                                            isConnected={isConnected} 
+                                            onExplain={handleDocsLinkClick} 
+                                            onHelp={() => {}} 
+                                            onClose={() => {}}
+                                            highlightMap={highlightMap}
+                                        />
+                                    )}
                                 </div>
                                 <div>
-                                    <div className="text-[10px] font-bold text-slate-500 uppercase mb-2">Beslutsmotor (Logik)</div>
-                                    <LogicLayer 
-                                        ref={logicRefs} 
-                                        onExplain={handleDocsLinkClick} 
-                                        onHelp={() => {}} 
-                                        onClose={() => {}} 
-                                        vadThreshold={vadThreshold} setVadThreshold={setVadThreshold}
-                                        silenceThreshold={silenceThreshold} setSilenceThreshold={setSilenceThreshold}
-                                        elasticityStart={elasticityStart} setElasticityStart={setElasticityStart}
-                                        minTurnDuration={minTurnDuration} setMinTurnDuration={setMinTurnDuration}
-                                        minSpeechDuration={minSpeechDuration} setMinSpeechDuration={setMinSpeechDuration}
-                                        autoSleepTimeout={autoSleepTimeout} setAutoSleepTimeout={setAutoSleepTimeout}
-                                        aiSpeakingRate={aiSpeakingRate} setAiSpeakingRate={setAiSpeakingRate}
-                                        coldStartSamples={coldStartSamples} setColdStartSamples={setColdStartSamples}
-                                        highlightMap={highlightMap}
-                                    />
+                                    <SectionHeader title="Beslutsmotor (Logik)" id="logic" isOpen={!collapsedSections['logic']} />
+                                    {!collapsedSections['logic'] && (
+                                        <LogicLayer 
+                                            ref={logicRefs} 
+                                            onExplain={handleDocsLinkClick} 
+                                            onHelp={() => {}} 
+                                            onClose={() => {}} 
+                                            vadThreshold={vadThreshold} setVadThreshold={setVadThreshold}
+                                            silenceThreshold={silenceThreshold} setSilenceThreshold={setSilenceThreshold}
+                                            elasticityStart={elasticityStart} setElasticityStart={setElasticityStart}
+                                            minTurnDuration={minTurnDuration} setMinTurnDuration={setMinTurnDuration}
+                                            minSpeechDuration={minSpeechDuration} setMinSpeechDuration={setMinSpeechDuration}
+                                            autoSleepTimeout={autoSleepTimeout} setAutoSleepTimeout={setAutoSleepTimeout}
+                                            coldStartSamples={coldStartSamples} setColdStartSamples={setColdStartSamples}
+                                            momentumStart={momentumStart} setMomentumStart={setMomentumStart}
+                                            ghostTolerance={ghostTolerance} setGhostTolerance={setGhostTolerance}
+                                            aiSpeakingRate={aiSpeakingRate} setAiSpeakingRate={setAiSpeakingRate}
+                                            highlightMap={highlightMap}
+                                            // NEW: Pass stats to LogicLayer for Tri-Velocity visualization
+                                            queueStats={queueStats}
+                                            currentPlaybackRate={currentPlaybackRate}
+                                        />
+                                    )}
                                 </div>
                                 <div>
-                                    <div className="text-[10px] font-bold text-slate-500 uppercase mb-2">Ljudmotor</div>
-                                    <AudioLayer 
-                                        ref={audioRefs} 
-                                        onExplain={handleDocsLinkClick} 
-                                        onHelp={() => {}} 
-                                        onClose={() => {}}
-                                        volMultiplier={volMultiplier}
-                                        setVolMultiplier={setVolMultiplier}
-                                        highlightMap={highlightMap}
-                                    />
+                                    <SectionHeader title="Ljudmotor" id="audio" isOpen={!collapsedSections['audio']} />
+                                    {!collapsedSections['audio'] && (
+                                        <AudioLayer 
+                                            ref={audioRefs} 
+                                            onExplain={handleDocsLinkClick} 
+                                            onHelp={() => {}} 
+                                            onClose={() => {}}
+                                            volMultiplier={volMultiplier}
+                                            setVolMultiplier={setVolMultiplier}
+                                            highlightMap={highlightMap}
+                                            getBufferStatus={getBufferStatus}
+                                            isJitterEnabled={isJitterEnabled}
+                                            setIsJitterEnabled={setIsJitterEnabled}
+                                            jitterIntensity={jitterIntensity}
+                                            setJitterIntensity={setJitterIntensity}
+                                        />
+                                    )}
                                 </div>
                             </div>
 
                             <div>
-                                <div className="text-[10px] font-bold text-slate-500 uppercase mb-2">Globala Verktyg</div>
-                                <TowerSettings 
-                                    inputDeviceId={inputDeviceId} setInputDeviceId={setInputDeviceId}
-                                    outputDeviceId={outputDeviceId} setOutputDeviceId={setOutputDeviceId}
-                                    debugMode={debugMode} setDebugMode={setDebugMode}
-                                    onOpenCalibration={onOpenCalibration}
-                                    onHelp={() => {}} onExplain={handleDocsLinkClick}
-                                    onClose={() => {}} highlightKey={selectedInfo}
-                                    enableLogs={enableLogs} setEnableLogs={setEnableLogs}
-                                    onOpenPromptModal={onOpenPromptModal}
-                                    visualsEnabled={visualsEnabled}
-                                    setVisualsEnabled={setVisualsEnabled}
-                                />
-                            </div>
-
-                            <div>
-                                <div className="text-[10px] font-bold text-slate-500 uppercase mb-2">Diagnos LAB</div>
-                                <TowerDoctor 
-                                    diagnosticsRef={diagnosticsRef} onClose={() => {}}
-                                    triggerTestTone={triggerTestTone} injectTextAsAudio={injectTextAsAudio}
-                                    onAdjustConfig={handleAdjustConfig} onToggleConnection={handleToggleConnection}
-                                    onUpdateInstruction={setCustomSystemInstruction} initAudioInput={initAudioInput} 
-                                    simulateNetworkDrop={simulateNetworkDrop}
-                                />
+                                <SectionHeader title="Diagnos LAB" id="lab" isOpen={!collapsedSections['lab']} />
+                                {!collapsedSections['lab'] && (
+                                    <TowerDoctor 
+                                        diagnosticsRef={diagnosticsRef} onClose={() => {}}
+                                        triggerTestTone={triggerTestTone} injectTextAsAudio={injectTextAsAudio}
+                                        onAdjustConfig={handleAdjustConfig} onToggleConnection={handleToggleConnection}
+                                        onUpdateInstruction={setCustomSystemInstruction} initAudioInput={initAudioInput} 
+                                        simulateNetworkDrop={simulateNetworkDrop}
+                                    />
+                                )}
                             </div>
 
                             <div className="pt-8 mt-8 border-t border-slate-800">
-                                <div className="text-[10px] font-bold text-slate-500 uppercase mb-2">Systemunderhåll</div>
-                                <TowerMaintenance onClose={() => {}} />
+                                <SectionHeader title="Systemunderhåll" id="maintenance" isOpen={!collapsedSections['maintenance']} />
+                                {!collapsedSections['maintenance'] && (
+                                    <TowerMaintenance onClose={() => {}} />
+                                )}
                             </div>
 
                         </div>

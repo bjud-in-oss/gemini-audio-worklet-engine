@@ -4,9 +4,16 @@ import React from 'react';
 interface JitterSimulatorProps {
     isEnabled: boolean;
     setIsEnabled: (enabled: boolean) => void;
+    jitterIntensity?: number;
+    setJitterIntensity?: (val: number) => void;
 }
 
-const JitterSimulator: React.FC<JitterSimulatorProps> = ({ isEnabled, setIsEnabled }) => {
+const JitterSimulator: React.FC<JitterSimulatorProps> = ({ 
+    isEnabled, 
+    setIsEnabled,
+    jitterIntensity = 200,
+    setJitterIntensity
+}) => {
     return (
         <div className={`p-3 rounded-xl border transition-all duration-300 ${isEnabled ? 'bg-orange-900/20 border-orange-500/50' : 'bg-slate-900/50 border-slate-800'}`}>
             <div className="flex items-center justify-between mb-2">
@@ -27,10 +34,23 @@ const JitterSimulator: React.FC<JitterSimulatorProps> = ({ isEnabled, setIsEnabl
                 </label>
             </div>
             
+            {isEnabled && setJitterIntensity && (
+                <div className="space-y-2 animate-in fade-in zoom-in duration-300 mb-2">
+                    <div className="flex justify-between text-[9px] text-slate-400">
+                        <span>MAX JITTER</span>
+                        <span>{jitterIntensity}ms</span>
+                    </div>
+                    <input 
+                        type="range" min="50" max="1000" step="50"
+                        value={jitterIntensity}
+                        onChange={(e) => setJitterIntensity(parseInt(e.target.value))}
+                        className="w-full h-1.5 bg-orange-900/50 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                    />
+                </div>
+            )}
+            
             <p className="text-[10px] text-slate-400 leading-relaxed">
-                Slumpar en fördröjning på <strong>0-200ms</strong> för varje inkommande ljudpaket innan det skrivs till Ring Buffern.
-                <br/><br/>
-                Använd detta för att testa om <strong>Elastic Rate Control</strong> lyckas jämna ut uppspelningen utan att det hörs hack.
+                Stressa motorn med 0-{jitterIntensity}ms slumpmässig fördröjning per paket.
             </p>
         </div>
     );

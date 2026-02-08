@@ -1,16 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
-import { useGeminiLive } from './hooks/useGeminiLive';
-import { useWakeLock } from './hooks/useWakeLock';
-import { SubtitleOverlay } from './components/SubtitleOverlay';
-import OnboardingModal from './components/OnboardingModal';
-import HeaderControls from './components/HeaderControls';
-import CalibrationModal from './components/CalibrationModal';
-import LanguageSelectorModal from './components/LanguageSelectorModal';
-import ControlBar from './components/ControlBar';
-import Tower from './components/Tower';
-import SystemPromptModal from './components/SystemPromptModal'; 
-import { AudioGroup } from './types';
+import { useGeminiLive } from '../hooks/useGeminiLive';
+import { useWakeLock } from '../hooks/useWakeLock';
+import { SubtitleOverlay } from './SubtitleOverlay';
+import HeaderControls from './HeaderControls';
+import CalibrationModal from './CalibrationModal';
+import LanguageSelectorModal from './LanguageSelectorModal';
+import ControlBar from './ControlBar';
+import Tower from './Tower';
+import SystemPromptModal from './SystemPromptModal'; 
+import { AudioGroup } from '../types';
 
 const ALL_LANGUAGES = [
   "Afrikaans", "Albanska", "Amhariska", "Arabiska", "Armeniska", "Azerbajdzjanska", "Baskiska", "Vitryska", "Bengali", "Bosniska", "Bulgariska", "Katalanska", "Cebuano", "Kinesiska (Förenklad)", "Kinesiska (Traditionell)", "Korsikanska", "Kroatiska", "Tjeckiska", "Danska", "Nederländska", "Engelska", "Esperanto", "Estniska", "Finska", "Franska", "Frisiska", "Galiciska", "Georgiska", "Tyska", "Grekiska", "Gujarati", "Haitisk kreol", "Hausa", "Hawaiiska", "Hebreiska", "Hindi", "Hmong", "Ungerska", "Isländska", "Igbo", "Indonesiska", "Irländska", "Italienska", "Japanska", "Javanesiska", "Kannada", "Kazakiska", "Khmer", "Koreanska", "Kurdiska", "Kirgiziska", "Lao", "Latin", "Lettiska", "Litauiska", "Luxemburgska", "Makedonska", "Madagaskiska", "Malajiska", "Malayalam", "Maltesiska", "Maori", "Marathi", "Mongoliska", "Burmesiska", "Nepalesiska", "Norska", "Nyanja", "Pashto", "Persiska", "Polska", "Portugisiska", "Punjabi", "Rumänska", "Ryska", "Samoanska", "Skotsk gäliska", "Serbiska", "Sesotho", "Shona", "Sindhi", "Singalesiska", "Slovakiska", "Slovenska", "Somaliska", "Spanska", "Sundanesiska", "Swahili", "Svenska", "Tagalog (Filipino)", "Tadzjikiska", "Tamil", "Telugu", "Thailändska", "Turkiska", "Ukrainska", "Urdu", "Uzbekiska", "Vietnamesiska", "Walesiska", "Xhosa", "Jiddisch", "Yoruba", "Zulu"
@@ -75,6 +74,8 @@ const App: React.FC = () => {
     effectiveMinDuration,
     debugMode,
     setDebugMode,
+    aiSpeakingRate,
+    setAiSpeakingRate,
     activePhraseTiming, 
     audioContext,       
     audioDiagnosticsRef,
@@ -87,7 +88,17 @@ const App: React.FC = () => {
     setCustomSystemInstruction, 
     enableLogs, 
     setEnableLogs,
-    simulateNetworkDrop 
+    simulateNetworkDrop,
+    getBufferStatus,
+    isJitterEnabled,
+    setIsJitterEnabled,
+    jitterIntensity,
+    setJitterIntensity,
+    // ADDED: Pro Mode & Transcription Configs
+    enableProMode,
+    setEnableProMode,
+    isTranscriptionEnabled,
+    setIsTranscriptionEnabled
   } = useGeminiLive();
 
   useEffect(() => {
@@ -104,16 +115,12 @@ const App: React.FC = () => {
   const [showSubtitles, setShowSubtitles] = useState(true);
 
   const handleSaveLanguages = (langs: string[]) => setTargetLanguages(langs);
-  const handleOnboardingComplete = (lang: string) => setTargetLanguages([lang]);
 
   const handleRoomChange = (room: string) => {
       setCurrentRoom(room);
-      if (room !== LOCAL_MODE_NAME && targetLanguages.length > 1) {
-          setTargetLanguages([targetLanguages[0]]);
-      }
+      // NOTE: We no longer force single language here to allow dual-mode experimentation
   };
 
-  // --- PERSISTENT ACTIVE ITEM LOGIC (Linger Effect) ---
   const [lastActiveGroupId, setLastActiveGroupId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -122,7 +129,6 @@ const App: React.FC = () => {
       }
   }, [activePhraseTiming]);
 
-  // If audio is playing, use that ID. If not, fallback to the last known ID.
   const effectiveActiveGroupId = activePhraseTiming?.groupId ?? lastActiveGroupId;
 
   const activeItem = effectiveActiveGroupId !== null 
@@ -148,23 +154,24 @@ const App: React.FC = () => {
   return (
     <div className="h-screen w-screen bg-[#101010] text-white overflow-hidden font-sans relative flex flex-col items-center justify-center">
       
-      {/* 1. BACKGROUND LAYER (Simpler, darker gradient) */}
+      {/* 1. BACKGROUND LAYER */}
       <div className="absolute inset-0 bg-gradient-to-b from-[#1a1a1a] to-[#050505] z-0"></div>
       
       {/* 2. MODAL LAYER */}
-      <OnboardingModal 
-        allLanguages={ALL_LANGUAGES} 
-        onComplete={handleOnboardingComplete} 
-      />
+      {/* Onboarding Removed */}
 
       <div className="absolute top-0 left-0 w-full z-50">
         <HeaderControls 
             currentRoom={currentRoom}
             onRoomChange={handleRoomChange}
             userLanguage={targetLanguages.length > 1 ? `${targetLanguages.length} Språk` : targetLanguages[0] || 'Välj'}
+            targetLanguages={targetLanguages}
+            allLanguages={ALL_LANGUAGES} // PASS ALL LANGUAGES FOR ANIMATION
             onOpenLangModal={() => setShowLangModal(true)}
-            onToggleTower={() => setDebugMode(!debugMode)} 
+            onOpenSettings={() => setDebugMode(true)} 
             status={status}
+            isTranscriptionEnabled={isTranscriptionEnabled}
+            setIsTranscriptionEnabled={setIsTranscriptionEnabled}
             showSubtitles={showSubtitles}
             onToggleSubtitles={() => setShowSubtitles(!showSubtitles)}
         />
@@ -193,6 +200,8 @@ const App: React.FC = () => {
         customSystemInstruction={customSystemInstruction}
         setCustomSystemInstruction={setCustomSystemInstruction}
         targetLanguages={targetLanguages}
+        aiSpeakingRate={aiSpeakingRate}
+        allLanguages={ALL_LANGUAGES}
       />
 
       {/* 3. NOTIFICATION LAYER */}
@@ -217,7 +226,6 @@ const App: React.FC = () => {
       <div 
         className={`flex-1 w-full relative z-10 flex flex-col transition-opacity duration-700 ease-in-out ${showSubtitles ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
       >
-          {/* Note: We pass activePhraseTiming which might be null now, handled by ActiveItem */}
           <SubtitleOverlay 
             activeGroup={activeGroup}
             activePhraseTiming={activePhraseTiming}
@@ -227,7 +235,7 @@ const App: React.FC = () => {
           />
       </div>
       
-      {/* 5. DIAGNOSTICS LAYER */}
+      {/* 5. DIAGNOSTICS LAYER (TOWER) */}
       {debugMode && (
           <Tower 
               diagnosticsRef={audioDiagnosticsRef} 
@@ -235,54 +243,51 @@ const App: React.FC = () => {
               triggerTestTone={triggerTestTone} 
               injectTextAsAudio={injectTextAsAudio}
               initAudioInput={initAudioInput} 
-              
+              aiSpeakingRate={aiSpeakingRate}
+              setAiSpeakingRate={setAiSpeakingRate}
               minTurnDuration={minTurnDuration}
               setMinTurnDuration={setMinTurnDuration}
               vadThreshold={vadThreshold}
               setVadThreshold={setVadThreshold}
               silenceThreshold={silenceThreshold}
               setSilenceThreshold={setSilenceThreshold}
-              
               elasticityStart={elasticityStart}
               setElasticityStart={setElasticityStart}
               minSpeechDuration={minSpeechDuration}
               setMinSpeechDuration={setMinSpeechDuration}
-
               volMultiplier={volMultiplier}
               setVolMultiplier={setVolMultiplier}
-
-              // PASS DEVICES
               inputDeviceId={inputDeviceId}
               setInputDeviceId={setInputDeviceId}
               outputDeviceId={outputDeviceId}
               setOutputDeviceId={setOutputDeviceId}
-
-              // NEW: PASS CONFIGS TO TOWER
               coldStartSamples={coldStartSamples}
               setColdStartSamples={setColdStartSamples}
               autoSleepTimeout={autoSleepTimeout}
               setAutoSleepTimeout={setAutoSleepTimeout}
-              
-              // NEW: GHOST PROPS
               momentumStart={momentumStart}
               setMomentumStart={setMomentumStart}
               ghostTolerance={ghostTolerance}
               setGhostTolerance={setGhostTolerance}
-
               debugMode={debugMode}
               setDebugMode={setDebugMode}
               onOpenCalibration={() => setShowCalibrationModal(true)}
-
               connect={connect}
               disconnect={disconnect}
               setCustomSystemInstruction={setCustomSystemInstruction}
-
               enableLogs={enableLogs}
               setEnableLogs={setEnableLogs}
-              
               onOpenPromptModal={() => setShowPromptModal(true)}
-              
               simulateNetworkDrop={simulateNetworkDrop}
+              getBufferStatus={getBufferStatus}
+              isJitterEnabled={isJitterEnabled}
+              setIsJitterEnabled={setIsJitterEnabled}
+              jitterIntensity={jitterIntensity}
+              setJitterIntensity={setJitterIntensity}
+              queueStats={queueStats}
+              currentPlaybackRate={currentPlaybackRate}
+              enableProMode={enableProMode}
+              setEnableProMode={setEnableProMode}
           />
       )}
 
