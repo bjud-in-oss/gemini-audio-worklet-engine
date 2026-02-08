@@ -22,14 +22,14 @@ const AudioDistribution: React.FC = () => {
                         <div className="bg-slate-950 p-3 rounded border border-slate-800">
                             <strong className="text-white text-xs block mb-1">Nuvarande Flöde</strong>
                             <p className="text-[10px] text-slate-500">
-                                App -> Ljudkort -> Tesira -> <span className="text-orange-400">Zoom / Hörslinga / FM-sändare</span>.
+                                App → Ljudkort → Tesira → <span className="text-orange-400">Zoom / Hörslinga / FM-sändare</span>.
                                 <br/><em>Lyssnaren behöver extern hårdvara eller Zoom-appen.</em>
                             </p>
                         </div>
                         <div className="bg-slate-950 p-3 rounded border border-slate-800">
                             <strong className="text-white text-xs block mb-1">Vision (BYOD)</strong>
                             <p className="text-[10px] text-slate-500">
-                                App -> Wi-Fi -> <span className="text-green-400">Lyssnarens Mobil</span>.
+                                App → Wi-Fi → <span className="text-green-400">Lyssnarens Mobil</span>.
                                 <br/><em>Besökaren scannar en QR-kod och lyssnar i webbläsaren.</em>
                             </p>
                         </div>

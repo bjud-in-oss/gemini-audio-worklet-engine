@@ -22,7 +22,7 @@ const LongDurationStrategy: React.FC = () => {
                     <div className="bg-slate-950 p-4 rounded border border-slate-800 space-y-2">
                         <p className="text-xs text-slate-400">
                             Gemini Live är en <em>Turn-based</em> modell. Den förväntar sig:
-                            <br/><code>Lyssna -> Tänk -> Svara.</code>
+                            <br/><code>Lyssna → Tänk → Svara.</code>
                         </p>
                         <p className="text-xs text-slate-400">
                             Om den tvingas lyssna i 20 minuter utan att få svara ("Turn Complete"), fylls dess <strong>Input Buffer</strong> upp. Till slut klipper servern anslutningen för att skydda sig mot minnesläckage.

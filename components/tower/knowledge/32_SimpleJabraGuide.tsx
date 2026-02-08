@@ -30,7 +30,7 @@ const SimpleJabraGuide: React.FC = () => {
                         <ol className="list-decimal list-inside text-xs text-slate-300 space-y-2">
                             <li>Koppla in din Jabra Puck via USB.</li>
                             <li>Öppna <strong>Audio MIDI Setup</strong> på Macen.</li>
-                            <li>Tryck <code>+</code> -> <strong>Create Multi-Output Device</strong>.</li>
+                            <li>Tryck <code>+</code> → <strong>Create Multi-Output Device</strong>.</li>
                             <li>Kryssa i följande enheter i listan:
                                 <ul className="list-disc list-inside ml-4 mt-1 text-teal-400">
                                     <li>[x] BlackHole 2ch (Drift Correction)</li>

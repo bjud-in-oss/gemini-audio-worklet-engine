@@ -15,7 +15,7 @@ const AudioMixingScenarios: React.FC = () => {
                     <h4 className="text-white font-bold text-xs uppercase tracking-widest border-l-4 border-red-500 pl-3">Problemet: AI-Rundgång</h4>
                     <div className="bg-slate-950 p-4 rounded border border-slate-800 space-y-2">
                         <p className="text-xs text-slate-400 leading-relaxed">
-                            <strong>Scenario:</strong> AI:n översätter -> Ljudet går ut i kyrkans högtalare -> Mikrofonen hör högtalarna -> AI:n hör sig själv -> AI:n översätter sin egen översättning (Loop).
+                            <strong>Scenario:</strong> AI:n översätter → Ljudet går ut i kyrkans högtalare → Mikrofonen hör högtalarna → AI:n hör sig själv → AI:n översätter sin egen översättning (Loop).
                         </p>
                         <div className="flex gap-2 text-[10px] font-mono mt-2">
                             <div className="bg-red-900/20 p-1.5 rounded border border-red-500/30 text-red-300 flex-1 text-center">
@@ -106,8 +106,8 @@ const AudioMixingScenarios: React.FC = () => {
                         </div>
                         <p className="text-[10px] text-slate-500 mt-1">
                             I Tesiran tar du emot USB (2-ch). Du splitar upp signalen. 
-                            <br/>Vänster -> Högtalare + AEC Ref. 
-                            <br/>Höger -> Zoom Mix.
+                            <br/>Vänster → Högtalare + AEC Ref. 
+                            <br/>Höger → Zoom Mix.
                         </p>
                     </div>
                 </div>

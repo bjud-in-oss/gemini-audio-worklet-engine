@@ -35,8 +35,8 @@ const VirtualCableGuide: React.FC = () => {
                             <strong>Chrome/Edge stöder INTE ASIO.</strong> De ser bara standard Windows Audio (WASAPI).
                         </p>
                         <ul className="list-disc list-inside text-[10px] text-slate-500 ml-2">
-                            <li>Om Zoom skickar ljud via ASIO -> Webben är döv.</li>
-                            <li>Om du använder VB-Cable (WDM) -> Du tappar ASIO-prestandan i Zoom.</li>
+                            <li>Om Zoom skickar ljud via ASIO → Webben är döv.</li>
+                            <li>Om du använder VB-Cable (WDM) → Du tappar ASIO-prestandan i Zoom.</li>
                         </ul>
                     </div>
                 </div>
@@ -54,15 +54,15 @@ const VirtualCableGuide: React.FC = () => {
                             <div className="bg-slate-900 p-2 rounded border border-slate-700">
                                 <strong className="text-red-400 text-[10px] block mb-1">Webb (Nu)</strong>
                                 <p className="text-[9px] text-slate-500">
-                                    Zoom -> Kabel -> App.<br/>
+                                    Zoom → Kabel → App.<br/>
                                     Du hör inget (utan krångel).
                                 </p>
                             </div>
                             <div className="bg-slate-900 p-2 rounded border border-green-500/50">
                                 <strong className="text-green-400 text-[10px] block mb-1">Native App (Framtid)</strong>
                                 <p className="text-[9px] text-slate-500">
-                                    Zoom -> Högtalare (Du hör).<br/>
-                                    Appen -> "Tjuvlyssnar" på högtalaren (WASAPI Loopback).
+                                    Zoom → Högtalare (Du hör).<br/>
+                                    Appen → "Tjuvlyssnar" på högtalaren (WASAPI Loopback).
                                 </p>
                             </div>
                         </div>
@@ -101,7 +101,7 @@ const VirtualCableGuide: React.FC = () => {
                         <ol className="list-decimal list-inside text-xs text-slate-400 space-y-2">
                             <li>Installera <strong>VB-Cable</strong>.</li>
                             <li>I Zoom: Välj "CABLE Input" som högtalare. (Ljudet tystnar för dig).</li>
-                            <li>I Windows Ljudinställningar -> Inspelning -> CABLE Output -> Egenskaper -> Lyssna.</li>
+                            <li>I Windows Ljudinställningar → Inspelning → CABLE Output → Egenskaper → Lyssna.</li>
                             <li>Kryssa i <strong>"Lyssna på den här enheten"</strong> och välj dina riktiga högtalare.</li>
                             <li>I Appen: Välj "CABLE Output" som input.</li>
                         </ol>
