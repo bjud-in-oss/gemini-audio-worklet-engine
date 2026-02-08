@@ -44,7 +44,7 @@ const DynamicPersonaInjection: React.FC = () => {
                         <div className="flex items-center gap-3 bg-slate-950 p-2 rounded border-l-2 border-red-500">
                             <div className="w-16 text-[10px] font-bold text-red-400">ROCKET</div>
                             <div className="flex-1">
-                                <strong className="text-white text-xs block">ROCKET MODE (>25s)</strong>
+                                <strong className="text-white text-xs block">ROCKET MODE (&gt;25s)</strong>
                                 <p className="text-[10px] text-slate-500">"URGENT. Summarize content. Telegraphic style." (Auktionsförrättare).</p>
                             </div>
                         </div>

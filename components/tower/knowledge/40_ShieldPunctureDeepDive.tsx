@@ -24,7 +24,7 @@ const ShieldPunctureDeepDive: React.FC = () => {
 
                 {/* 2. THE DEFINITIVE FIX */}
                 <div className="space-y-4 pt-4 border-t border-slate-800">
-                    <h4 className="text-emerald-400 font-bold text-xs uppercase tracking-widest border-l-4 border-emerald-500 pl-3">Lösningen: Fysik > Tid (Buffer Lock)</h4>
+                    <h4 className="text-emerald-400 font-bold text-xs uppercase tracking-widest border-l-4 border-emerald-500 pl-3">Lösningen: Fysik &gt; Tid (Buffer Lock)</h4>
                     
                     <div className="bg-emerald-900/10 p-4 rounded border border-emerald-500/20 space-y-3">
                         <p className="text-xs text-slate-300">
