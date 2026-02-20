@@ -67,6 +67,9 @@ export function useLiveConfig() {
         return localStorage.getItem('app_custom_prompt') || null;
     });
 
+    // Add state
+    const [isAgcLocked, setIsAgcLocked] = useState<boolean>(false);
+
     // Save Logs setting
     useEffect(() => {
         localStorage.setItem('app_enable_logs', String(enableLogs));
@@ -112,6 +115,8 @@ export function useLiveConfig() {
         activeMode, setActiveMode,
         
         enableLogs, setEnableLogs,
-        customSystemInstruction, setCustomSystemInstruction
+        customSystemInstruction, setCustomSystemInstruction,
+
+        isAgcLocked, setIsAgcLocked
     };
 }
