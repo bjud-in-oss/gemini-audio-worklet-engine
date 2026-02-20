@@ -42,6 +42,53 @@ function calculateRMS(data) {
     return Math.sqrt(sum / data.length);
 }
 
+class AdaptiveDSP {
+    constructor() {
+        this.noiseFloor = 0.005; // Initial guess
+        this.currentGain = 1.0;
+        this.targetRMS = 0.08;   // Target level for Gemini
+    }
+
+    process(frame, isLocked, userVolumeMultiplier) {
+        let rms = calculateRMS(frame) + 1e-8;
+
+        if (!isLocked) {
+            // 1. Measure Reference Level (Adaptive Noise Floor)
+            if (rms < this.noiseFloor) {
+                // Fast drop to catch silence
+                this.noiseFloor = rms;
+            } else {
+                // Slow leak upwards to adapt to rising background noise
+                this.noiseFloor += (rms - this.noiseFloor) * 0.0005; 
+            }
+
+            // 2. Calculate AGC (Only adapt if someone is actually speaking above the noise)
+            if (rms > this.noiseFloor * 2.5) {
+                let desiredGain = this.targetRMS / rms;
+                // Clamp gain to prevent extreme amplification of distant sounds
+                desiredGain = Math.max(0.5, Math.min(desiredGain, 8.0));
+                
+                // Smooth attack/release to prevent "pumping"
+                this.currentGain += (desiredGain - this.currentGain) * 0.02;
+            }
+        }
+
+        // 3. Apply Processing (AGC + Soft Noise Gate)
+        for(let i = 0; i < frame.length; i++) {
+            let sampleMultiplier = this.currentGain * userVolumeMultiplier;
+            
+            // Soft Expander (Noise Gate): Attenuate signals close to the noise floor
+            if (rms < this.noiseFloor * 1.5) {
+                sampleMultiplier *= 0.1; // Drop volume by 90% instead of hard muting
+            }
+            
+            frame[i] = frame[i] * sampleMultiplier;
+        }
+
+        return { processedFrame: frame, currentNoiseFloor: this.noiseFloor };
+    }
+}
+
 class NeuralVad {
     constructor() {
         this.session = null;
@@ -152,21 +199,33 @@ class NeuralVad {
 }
 
 const vad = new NeuralVad();
+const dsp = new AdaptiveDSP();
 
 self.onmessage = async (e) => {
-    const { command, data, gain } = e.data;
+    const { command, data, gain, isAgcLocked } = e.data;
     if (command === 'PROCESS') {
         const inputFrame = new Float32Array(data);
-        const processedFrame = new Float32Array(inputFrame.length);
-        const g = typeof gain === 'number' ? gain : 1.0;
-        for(let i=0; i<inputFrame.length; i++) processedFrame[i] = inputFrame[i] * g;
+        
+        // 1. Run Custom DSP on RAW signal
+        const { processedFrame, currentNoiseFloor } = dsp.process(inputFrame, isAgcLocked, gain);
 
+        // 2. Calculate RMS on the processed signal
         const rms = calculateRMS(processedFrame);
         let prob = 0;
-        if (rms > 0.01) {
+        
+        // 3. Only run Neural VAD if signal is above absolute minimum energy
+        if (rms > 0.002) {
             prob = await vad.process(processedFrame);
         }
-        self.postMessage({ command: 'RESULT', chunk: processedFrame, prob, rms }, [processedFrame.buffer]);
+        
+        // 4. Return processed frame. useAudioInput will ONLY push this to Gemini if prob > threshold
+        self.postMessage({ 
+            command: 'RESULT', 
+            chunk: processedFrame, 
+            prob, 
+            rms,
+            noiseFloor: currentNoiseFloor 
+        }, [processedFrame.buffer]);
     } else if (command === 'RESET') {
         vad.reset();
     }
