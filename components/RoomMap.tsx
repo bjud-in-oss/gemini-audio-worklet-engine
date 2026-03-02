@@ -164,7 +164,7 @@ const RoomMap = forwardRef<RoomMapRef, RoomMapProps>(({
   return (
     <div 
         ref={containerRef}
-        className="w-full h-full relative bg-[#0f172a] cursor-grab active:cursor-grabbing touch-none"
+        className="w-full h-full relative bg-slate-900 cursor-grab active:cursor-grabbing touch-none"
         style={{ touchAction: 'none' }} 
         onWheel={handleWheel}
         onTouchStart={handleTouchStart}
@@ -219,8 +219,8 @@ const RoomMap = forwardRef<RoomMapRef, RoomMapProps>(({
                         style={{ cursor: 'pointer', pointerEvents: 'auto' }}
                         >
                             {isActive && <circle cx={point.x} cy={point.y} r="32" fill="rgba(220,38,38,0.2)" stroke="rgba(220,38,38,0.4)" strokeWidth="1"/>}
-                            <circle cx={point.x} cy={point.y} r={isActive ? 25 : 18} fill={isActive ? "#dc2626" : "#1e293b"} stroke={isActive ? "white" : "#475569"} strokeWidth="3" className="transition-all duration-300 ease-out" />
-                            <text x={point.x} y={point.y} dy=".35em" textAnchor="middle" fill={isActive ? "white" : "#94a3b8"} fontSize={isActive ? "14" : "10"} fontWeight="bold" fontFamily="monospace" pointerEvents="none">{point.id}</text>
+                            <circle cx={point.x} cy={point.y} r={isActive ? 25 : 18} strokeWidth="3" className={`transition-all duration-300 ease-out ${isActive ? "fill-red-600 stroke-white" : "fill-slate-800 stroke-slate-600"}`} />
+                            <text x={point.x} y={point.y} dy=".35em" textAnchor="middle" fontSize={isActive ? "14" : "10"} fontWeight="bold" fontFamily="monospace" pointerEvents="none" className={isActive ? "fill-white" : "fill-slate-400"}>{point.id}</text>
                             
                             <g transform={`translate(${point.x}, ${point.y - (isActive ? 45 : 30)})`} opacity={isActive ? 1 : 0} className="transition-opacity duration-300">
                                 {isActive && (
@@ -233,7 +233,7 @@ const RoomMap = forwardRef<RoomMapRef, RoomMapProps>(({
 
                             {isActive && hasChanged && (
                                 <g transform={`translate(${point.x + 45}, ${point.y})`} onClick={(e) => { e.stopPropagation(); onConfirm(); }} className="cursor-pointer animate-in zoom-in duration-300">
-                                    <circle r="22" fill="#22c55e" stroke="white" strokeWidth="2" filter="drop-shadow(0px 4px 6px rgba(0,0,0,0.5))" />
+                                    <circle r="22" strokeWidth="2" filter="drop-shadow(0px 4px 6px rgba(0,0,0,0.5))" className="fill-green-500 stroke-white" />
                                     <path d="M-8 0 L-2 6 L8 -6" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                                 </g>
                             )}
