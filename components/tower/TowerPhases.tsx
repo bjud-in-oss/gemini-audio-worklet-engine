@@ -16,6 +16,60 @@ interface TowerPhasesProps {
     onSelect?: (key: string) => void;
 }
 
+const PhaseBox = ({ 
+    id, label, rKey, barKey, color, icon, description, detail, isBuffer, mapToKey,
+    activeTooltip, handleBoxClick, setRef
+}: { 
+    id: string, label: string, rKey: keyof TowerPhasesRefs, barKey?: keyof TowerPhasesRefs, 
+    color: string, icon: React.ReactNode, description: string, detail: string, isBuffer?: boolean, mapToKey: string,
+    activeTooltip: string | null, handleBoxClick: (id: string, mapToKey?: string) => void, setRef: (key: keyof TowerPhasesRefs) => (el: any) => void
+}) => (
+    <div className="relative flex flex-col items-center">
+        {/* CONNECTOR LINE (Left of box, except first one) */}
+        {id !== 'MIC' && (
+            <div className="absolute top-1/2 -left-3 w-3 h-0.5 bg-slate-800 -z-10"></div>
+        )}
+
+        <button 
+            ref={setRef(rKey)} 
+            onClick={() => handleBoxClick(id, mapToKey)}
+            className={`group relative flex flex-col items-center justify-center w-full h-24 rounded-lg border border-slate-800 bg-slate-950 overflow-hidden outline-none transition-all duration-300 ${activeTooltip === id ? 'ring-2 ring-indigo-500 bg-slate-900' : ''}`}
+        >
+            {/* PROGRESS BAR (Only for buffers) - Added transition-height for smoothness */}
+            {barKey && (
+                <div className="absolute bottom-0 left-0 right-0 bg-opacity-20 z-0 flex items-end justify-center h-full pointer-events-none">
+                    <div 
+                        ref={setRef(barKey)} 
+                        className={`w-full bg-current opacity-30 transition-all duration-300 ease-out ${color}`} 
+                        style={{ height: '0%' }}
+                    ></div>
+                </div>
+            )}
+
+            {/* ACTIVE GLOW RING (Controlled by Tower.tsx via class manipulation) */}
+            <div className="absolute inset-0 rounded-lg ring-2 ring-offset-0 ring-transparent transition-all duration-500 pointer-events-none active-ring z-10"></div>
+            
+            {/* CONTENT - Added transition-opacity */}
+            <div className={`relative z-10 text-xl mb-1 ${color} transition-all duration-300 icon-container opacity-30 scale-95`}>{icon}</div>
+            <div className={`relative z-10 text-[9px] font-black uppercase tracking-widest ${color} mb-0.5 label-id opacity-40 transition-opacity duration-300`}>{id}</div>
+            <div className="relative z-10 text-[8px] text-slate-500 text-center font-bold label-text transition-colors duration-300">{label}</div>
+        </button>
+
+        {/* CLICK TOOLTIP */}
+        {activeTooltip === id && (
+            <div className="absolute top-full mt-3 left-1/2 -translate-x-1/2 w-48 bg-slate-900 border border-slate-600 p-3 rounded-lg shadow-2xl z-[100] animate-in fade-in zoom-in-95 duration-200">
+                <div className={`text-[10px] font-bold ${color} mb-1 uppercase tracking-wide`}>{label}</div>
+                <p className="text-[10px] text-slate-200 leading-relaxed mb-2 font-medium">{description}</p>
+                <div className={`text-[9px] font-mono p-1.5 rounded bg-slate-800 ${color} border border-slate-700`}>
+                    {detail}
+                </div>
+                {/* Arrow */}
+                <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-slate-900 border-t border-l border-slate-600 transform rotate-45"></div>
+            </div>
+        )}
+    </div>
+);
+
 const TowerPhases = forwardRef<TowerPhasesRefs, TowerPhasesProps>(({ onSelect }, ref) => {
     const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
