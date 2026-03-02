@@ -130,15 +130,113 @@ EXAMPLES:
 
 /**
  * Replaces variables in a template string with actual values.
+ * Maps human-readable language names to BCP-47 codes for better model understanding.
  */
 export function injectVariables(template: string, l1: string, l2: string): string {
+    const getBcp47 = (lang: string) => {
+        const mapping: Record<string, string> = {
+            "Afrikaans": "af-ZA",
+            "Azərbaycan (Azerbajdzjanska)": "az-AZ",
+            "Bahasa Indonesia": "id-ID",
+            "Bahasa Melayu": "ms-MY",
+            "Basa Jawa (Javanesiska)": "jv-ID",
+            "Bosanski (Bosniska)": "bs-BA",
+            "Català (Katalanska)": "ca-ES",
+            "Čeština (Tjeckiska)": "cs-CZ",
+            "Cymraeg (Walesiska)": "cy-GB",
+            "Dansk (Danska)": "da-DK",
+            "Deutsch (Tyska)": "de-DE",
+            "Eesti (Estniska)": "et-EE",
+            "English (Engelska)": "en-US",
+            "Español (Spanska)": "es-ES",
+            "Esperanto": "eo",
+            "Euskara (Baskiska)": "eu-ES",
+            "Filipino (Tagalog)": "fil-PH",
+            "Français (Franska)": "fr-FR",
+            "Frysk (Frisiska)": "fy-NL",
+            "Gaeilge (Irländska)": "ga-IE",
+            "Gàidhlig (Skotsk gäliska)": "gd-GB",
+            "Galego (Galiciska)": "gl-ES",
+            "Hausa": "ha-NG",
+            "Hrvatski (Kroatiska)": "hr-HR",
+            "Igbo": "ig-NG",
+            "Íslenska (Isländska)": "is-IS",
+            "Italiano (Italienska)": "it-IT",
+            "Kinyarwanda": "rw-RW",
+            "Kiswahili (Swahili)": "sw-KE",
+            "Latviešu (Lettiska)": "lv-LV",
+            "Lietuvių (Litauiska)": "lt-LT",
+            "Lëtzebuergesch (Luxemburgska)": "lb-LU",
+            "Magyar (Ungerska)": "hu-HU",
+            "Malti (Maltesiska)": "mt-MT",
+            "Māori": "mi-NZ",
+            "Nederlands (Nederländska)": "nl-NL",
+            "Norsk (Norska)": "no-NO",
+            "O‘zbek (Uzbekiska)": "uz-UZ",
+            "Polski (Polska)": "pl-PL",
+            "Português (Portugisiska)": "pt-PT",
+            "Română (Rumänska)": "ro-RO",
+            "Shqip (Albanska)": "sq-AL",
+            "Slovenčina (Slovakiska)": "sk-SK",
+            "Slovenščina (Slovenska)": "sl-SI",
+            "Soomaali (Somaliska)": "so-SO",
+            "Suomi (Finska)": "fi-FI",
+            "Svenska": "sv-SE",
+            "Tiếng Việt (Vietnamesiska)": "vi-VN",
+            "Türkçe (Turkiska)": "tr-TR",
+            "Yorùbá": "yo-NG",
+            "Zulu": "zu-ZA",
+            "Ελληνικά (Grekiska)": "el-GR",
+            "Беларуская (Vitryska)": "be-BY",
+            "Български (Bulgariska)": "bg-BG",
+            "Кыргызча (Kirgiziska)": "ky-KG",
+            "Македонски (Makedonska)": "mk-MK",
+            "Монгол (Mongoliska)": "mn-MN",
+            "Русский (Ryska)": "ru-RU",
+            "Српски (Serbiska)": "sr-RS",
+            "Тоҷикӣ (Tadzjikiska)": "tg-TJ",
+            "Українська (Ukrainska)": "uk-UA",
+            "Қазақ тілі (Kazakiska)": "kk-KZ",
+            "Հայերեն (Armeniska)": "hy-AM",
+            "עברית (Hebreiska)": "he-IL",
+            "ייִדיש (Jiddisch)": "yi",
+            "اردو (Urdu)": "ur-PK",
+            "العربية (Arabiska)": "ar-SA",
+            "فارسی (Persiska)": "fa-IR",
+            "پښتو (Pashto)": "ps-AF",
+            "नेपाली (Nepalesiska)": "ne-NP",
+            "मराठी (Marathi)": "mr-IN",
+            "हिन्दी (Hindi)": "hi-IN",
+            "বাংলা (Bengali)": "bn-BD",
+            "ਪੰਜਾਬੀ (Punjabi)": "pa-IN",
+            "ગુજરાતી (Gujarati)": "gu-IN",
+            "தமிழ் (Tamil)": "ta-IN",
+            "తెలుగు (Telugu)": "te-IN",
+            "ಕನ್ನಡ (Kannada)": "kn-IN",
+            "മലയാളം (Malayalam)": "ml-IN",
+            "සිංහල (Singalesiska)": "si-LK",
+            "ไทย (Thailändska)": "th-TH",
+            "ພາສາລາວ (Lao)": "lo-LA",
+            "ဗမာစာ (Burmesiska)": "my-MM",
+            "ខ្មែរ (Khmer)": "km-KH",
+            "한국어 (Koreanska)": "ko-KR",
+            "中文 (Kinesiska)": "zh-CN",
+            "日本語 (Japanska)": "ja-JP",
+            "አማርኛ (Amhariska)": "am-ET"
+        };
+        return mapping[lang] || lang; // Fallback to original string if not found
+    };
+
+    const bcp47_l1 = getBcp47(l1);
+    const bcp47_l2 = getBcp47(l2);
+
     let text = template;
-    // Replace Standardized Variables
-    text = text.replace(/{{L1}}/g, l1);
-    text = text.replace(/{{L2}}/g, l2);
+    // Replace Standardized Variables with BCP-47 codes
+    text = text.replace(/{{L1}}/g, bcp47_l1);
+    text = text.replace(/{{L2}}/g, bcp47_l2);
     // Legacy support
-    text = text.replace(/{{ANCHOR}}/g, l1);
-    text = text.replace(/{{TARGET}}/g, l2);
+    text = text.replace(/{{ANCHOR}}/g, bcp47_l1);
+    text = text.replace(/{{TARGET}}/g, bcp47_l2);
     return text.trim();
 }
 
