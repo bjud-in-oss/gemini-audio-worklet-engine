@@ -129,18 +129,36 @@ const LanguageSelectorModal: React.FC<LanguageSelectorModalProps> = ({
 
   if (!isOpen) return null;
 
-  const renderSlotRow = (index: 0 | 1, lang: string | null, label: string, baseColor: string, inputRef: React.RefObject<HTMLInputElement | null>) => {
+  const renderSlotRow = (index: 0 | 1, lang: string | null, label: string, baseColor: 'indigo' | 'rose', inputRef: React.RefObject<HTMLInputElement | null>) => {
       const isActiveSearch = activeSearchSlot === index;
       const isSelected = !!lang && !isActiveSearch;
       
-      let containerClass = "bg-[#1a1a1a] border-[#333]";
-      if (isActiveSearch) containerClass = `bg-[#1a1a1a] border-${baseColor}-500 shadow-[0_0_15px_rgba(var(--color-${baseColor}-500),0.2)]`;
-      if (isSelected) containerClass = `bg-${baseColor}-900/20 border-${baseColor}-500/50`;
+      let containerClass = "bg-slate-900 border-slate-700";
+      if (isActiveSearch) {
+          if (baseColor === 'indigo') containerClass = "bg-slate-900 border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.2)]";
+          else if (baseColor === 'rose') containerClass = "bg-slate-900 border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.2)]";
+      }
+      if (isSelected) {
+          if (baseColor === 'indigo') containerClass = "bg-indigo-900/20 border-indigo-500/50";
+          else if (baseColor === 'rose') containerClass = "bg-rose-900/20 border-rose-500/50";
+      }
+
+      let circleClass = "border-slate-600";
+      if (isSelected) {
+          if (baseColor === 'indigo') circleClass = "bg-indigo-500 border-indigo-500";
+          else if (baseColor === 'rose') circleClass = "bg-rose-500 border-rose-500";
+      }
+
+      let labelClass = "text-slate-600";
+      if (isSelected) {
+          if (baseColor === 'indigo') labelClass = "text-indigo-400";
+          else if (baseColor === 'rose') labelClass = "text-rose-400";
+      }
 
       return (
           <div onClick={() => lang ? performClear(index) : handleSlotClick(index)} className={`w-full px-4 py-4 rounded-xl flex items-center justify-between transition-all duration-300 border-2 cursor-pointer ${containerClass}`}>
               <div className="flex items-center gap-4 flex-1">
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? `bg-${baseColor}-500 border-${baseColor}-500` : 'border-slate-600'}`}>
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${circleClass}`}>
                       {isSelected && <svg className="w-3 h-3 text-white" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
                   </div>
                   <div className="flex-1 relative h-6 flex items-center">
@@ -170,7 +188,7 @@ const LanguageSelectorModal: React.FC<LanguageSelectorModalProps> = ({
                       )}
                   </div>
               </div>
-              <span className={`text-xs font-bold font-mono ml-3 ${isSelected ? `text-${baseColor}-400` : 'text-slate-600'}`}>{label}</span>
+              <span className={`text-xs font-bold font-mono ml-3 ${labelClass}`}>{label}</span>
           </div>
       );
   };
@@ -183,10 +201,10 @@ const LanguageSelectorModal: React.FC<LanguageSelectorModalProps> = ({
       </button>
 
       {/* BACKDROP */}
-      <div className="absolute inset-0 bg-[#101010] pointer-events-auto" style={{ top: '100px' }} onClick={onClose}></div>
+      <div className="absolute inset-0 bg-slate-950 pointer-events-auto" style={{ top: '100px' }} onClick={onClose}></div>
 
       {/* CONTENT CONTAINER - 100px Top Margin */}
-      <div className="bg-[#101010] w-full max-w-md h-[calc(100vh-100px)] flex flex-col pointer-events-auto relative z-[110]" style={{ marginTop: '100px' }} onClick={(e) => e.stopPropagation()}>
+      <div className="bg-slate-950 w-full max-w-md h-[calc(100vh-100px)] flex flex-col pointer-events-auto relative z-[110]" style={{ marginTop: '100px' }} onClick={(e) => e.stopPropagation()}>
         
         {/* HEADER AREA (Slots) */}
         <div className="flex flex-col gap-3 p-6 shrink-0">
