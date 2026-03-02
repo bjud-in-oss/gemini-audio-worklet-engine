@@ -148,10 +148,10 @@ const App: React.FC = () => {
     .map(t => ({ id: t.id, text: t.text }));
 
   return (
-    <div className="h-screen w-screen bg-[#101010] text-white overflow-hidden font-sans relative flex flex-col items-center justify-center">
+    <div className="h-screen w-screen bg-slate-950 text-white overflow-hidden font-sans relative flex flex-col items-center justify-center">
       
       {/* 1. BACKGROUND LAYER (Simpler, darker gradient) */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#1a1a1a] to-[#050505] z-0"></div>
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-900 to-slate-950 z-0"></div>
       
       {/* 2. MODAL LAYER */}
       <OnboardingModal 
