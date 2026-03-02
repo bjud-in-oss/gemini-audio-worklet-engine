@@ -115,6 +115,7 @@ const HeaderControls: React.FC<HeaderControlsProps> = ({
       // 3. Language Modal is CLOSED 
       // 4. Room Modal is CLOSED
       // 5. We are NOT currently waiting for the modal to open (The Fix)
+      // AI FIX: Added isWaitingForModal check
       if (!hasLanguage && !isHeroMode && !isLangModalOpen && !showRoomModal && !isWaitingForModal) {
           const timer = setTimeout(() => setIsHeroMode(true), 500);
           return () => clearTimeout(timer);
@@ -178,7 +179,7 @@ const HeaderControls: React.FC<HeaderControlsProps> = ({
   // LAYOUT LOGIC
   const wrapperClass = isHeroMode
       ? "fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm transition-all duration-700 ease-in-out"
-      : "fixed top-0 left-0 w-full z-[60] flex items-start pt-6 transition-all duration-700 ease-in-out bg-gradient-to-b from-[#101010] to-transparent h-32";
+      : "fixed top-0 left-0 w-full z-[60] flex items-start pt-6 transition-all duration-700 ease-in-out bg-gradient-to-b from-slate-950 to-transparent h-32";
 
   // ALWAYS CENTERED
   const containerClass = isHeroMode
