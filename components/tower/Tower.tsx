@@ -205,27 +205,27 @@ const Tower: React.FC<TowerProps> = ({
             const text = el.querySelector('.label-text') as HTMLElement | null;
             
             if (active) {
-                el.style.backgroundColor = 'rgba(30, 41, 59, 1)'; 
-                el.style.borderColor = 'rgba(255,255,255,0.2)';
+                el.classList.add('bg-slate-800', 'border-white/20');
+                el.classList.remove('bg-slate-950', 'border-slate-800');
                 if (icon) { 
                     icon.classList.remove('opacity-30', 'scale-95');
                     icon.classList.add('opacity-100', 'scale-110');
                 }
                 if (label) label.classList.replace('opacity-40', 'opacity-100');
-                if (text) { text.style.color = '#fff'; }
+                if (text) { text.classList.add('text-white'); text.classList.remove('text-slate-500'); }
                 if (ring) {
                     ring.classList.add(colorClass); 
                     ring.classList.remove('ring-transparent');
                 }
             } else {
-                el.style.backgroundColor = 'rgba(2, 6, 23, 0.5)'; 
-                el.style.borderColor = 'rgba(30, 41, 59, 0.5)';
+                el.classList.add('bg-slate-950', 'border-slate-800');
+                el.classList.remove('bg-slate-800', 'border-white/20');
                 if (icon) { 
                     icon.classList.remove('opacity-100', 'scale-110');
                     icon.classList.add('opacity-30', 'scale-95');
                 }
                 if (label) label.classList.replace('opacity-100', 'opacity-40');
-                if (text) { text.style.color = '#64748b'; }
+                if (text) { text.classList.add('text-slate-500'); text.classList.remove('text-white'); }
                 if (ring) {
                     ring.classList.remove(colorClass);
                     ring.classList.add('ring-transparent');
@@ -246,8 +246,24 @@ const Tower: React.FC<TowerProps> = ({
 
             if (net.keyRef) { net.keyRef.innerText = (process.env.API_KEY && process.env.API_KEY.length > 5) ? "OK" : "NO"; net.keyRef.className = (process.env.API_KEY && process.env.API_KEY.length > 5) ? "text-green-400 font-bold" : "text-red-500 font-bold"; }
             if (net.wsRef) { net.wsRef.innerText = data.wsState || '---'; net.wsRef.className = data.wsState === 'OPEN' ? 'text-green-400 font-bold text-xs' : 'text-yellow-400 text-xs'; }
-            if (net.rxRef) { net.rxRef.style.backgroundColor = data.serverRx ? '#22c55e' : '#1e293b'; net.rxRef.style.boxShadow = data.serverRx ? '0 0 8px #22c55e' : 'none'; }
-            if (net.txRef) { net.txRef.style.backgroundColor = data.networkEvent !== 'idle' ? '#3b82f6' : '#1e293b'; }
+            if (net.rxRef) { 
+                if (data.serverRx) {
+                    net.rxRef.classList.add('bg-green-500', 'shadow-[0_0_8px_#22c55e]');
+                    net.rxRef.classList.remove('bg-slate-800');
+                } else {
+                    net.rxRef.classList.add('bg-slate-800');
+                    net.rxRef.classList.remove('bg-green-500', 'shadow-[0_0_8px_#22c55e]');
+                }
+            }
+            if (net.txRef) { 
+                if (data.networkEvent !== 'idle') {
+                    net.txRef.classList.add('bg-blue-500');
+                    net.txRef.classList.remove('bg-slate-800');
+                } else {
+                    net.txRef.classList.add('bg-slate-800');
+                    net.txRef.classList.remove('bg-blue-500');
+                }
+            }
             
             const vadEl = getEl('vad', 'disp-vad');
             if (vadEl) vadEl.innerText = (data.vadProb * 100).toFixed(0);
@@ -282,7 +298,17 @@ const Tower: React.FC<TowerProps> = ({
             }
 
             const gapEl = getEl('gap', 'disp-gap');
-            if (gapEl) { const gap = data.bufferGap || 0; gapEl.innerText = gap.toFixed(2) + 's'; gapEl.style.color = Math.abs(gap) > 0.5 ? '#facc15' : '#ffffff'; }
+            if (gapEl) { 
+                const gap = data.bufferGap || 0; 
+                gapEl.innerText = gap.toFixed(2) + 's'; 
+                if (Math.abs(gap) > 0.5) {
+                    gapEl.classList.add('text-yellow-400');
+                    gapEl.classList.remove('text-white');
+                } else {
+                    gapEl.classList.add('text-white');
+                    gapEl.classList.remove('text-yellow-400');
+                }
+            }
 
             const bufEl = getEl('buf', 'disp-buf');
             if (bufEl) { const isWarning = data.wsState !== 'OPEN' && data.bufferSize > 5; bufEl.innerText = data.bufferSize.toString(); bufEl.className = isWarning ? 'text-red-400 font-bold text-xs' : 'text-slate-400 text-xs'; }
