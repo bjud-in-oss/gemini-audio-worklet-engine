@@ -81,11 +81,11 @@ const SystemMap: React.FC<SystemMapProps> = ({ focusOnNode, interactive = true, 
 
     // Color helper - STRICT PALETTE
     const getNodeColor = (tags: string[]) => {
-        if (tags.includes('AI') || tags.includes('PRED')) return '#d946ef'; // Fuchsia-500
-        if (tags.includes('NET') || tags.includes('Transport')) return '#0ea5e9';    // Sky-500
-        if (tags.includes('LOGIC')) return '#10b981';  // Emerald-500
-        if (tags.includes('AUDIO')) return '#8b5cf6'; // Violet-500
-        return '#64748b'; // Slate-500
+        if (tags.includes('AI') || tags.includes('PRED')) return { stroke: 'stroke-fuchsia-500', fill: 'fill-fuchsia-500' };
+        if (tags.includes('NET') || tags.includes('Transport')) return { stroke: 'stroke-sky-500', fill: 'fill-sky-500' };
+        if (tags.includes('LOGIC')) return { stroke: 'stroke-emerald-500', fill: 'fill-emerald-500' };
+        if (tags.includes('AUDIO')) return { stroke: 'stroke-violet-500', fill: 'fill-violet-500' };
+        return { stroke: 'stroke-slate-500', fill: 'fill-slate-500' };
     };
 
     // --- INTERACTION ---
@@ -178,22 +178,22 @@ const SystemMap: React.FC<SystemMapProps> = ({ focusOnNode, interactive = true, 
             >
                 <defs>
                     <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5.5" refY="3" orient="auto">
-                        <polygon points="0 0, 4 2, 0 4" fill="#334155" />
+                        <polygon points="0 0, 4 2, 0 4" className="fill-slate-700" />
                     </marker>
                     {/* INCOMING COLOR (Blue) */}
                     <marker id="arrowhead-incoming" markerWidth="6" markerHeight="6" refX="5.5" refY="3" orient="auto">
-                        <polygon points="0 0, 4 2, 0 4" fill="#3b82f6" />
+                        <polygon points="0 0, 4 2, 0 4" className="fill-blue-500" />
                     </marker>
                     {/* OUTGOING COLOR (Yellow) */}
                     <marker id="arrowhead-outgoing" markerWidth="6" markerHeight="6" refX="5.5" refY="3" orient="auto">
-                        <polygon points="0 0, 4 2, 0 4" fill="#eab308" />
+                        <polygon points="0 0, 4 2, 0 4" className="fill-yellow-500" />
                     </marker>
                 </defs>
 
                 {/* LINKS */}
                 {links.map((link) => {
                     // Logic for Coloring based on Focus
-                    let color = "#1e293b";
+                    let colorClass = "stroke-slate-800";
                     let marker = "url(#arrowhead)";
                     let opacity = 0.2;
                     let strokeWidth = 0.3;
@@ -201,13 +201,13 @@ const SystemMap: React.FC<SystemMapProps> = ({ focusOnNode, interactive = true, 
                     if (focusOnNode) {
                         if (link.from === focusOnNode) {
                             // OUTGOING -> Yellow
-                            color = "#eab308";
+                            colorClass = "stroke-yellow-500";
                             marker = "url(#arrowhead-outgoing)";
                             opacity = 1;
                             strokeWidth = 0.6;
                         } else if (link.to === focusOnNode) {
                             // INCOMING -> Blue
-                            color = "#3b82f6";
+                            colorClass = "stroke-blue-500";
                             marker = "url(#arrowhead-incoming)";
                             opacity = 1;
                             strokeWidth = 0.6;
@@ -219,7 +219,7 @@ const SystemMap: React.FC<SystemMapProps> = ({ focusOnNode, interactive = true, 
                         // Hover Logic
                         if (link.from === hoveredId || link.to === hoveredId) {
                             opacity = 1;
-                            color = "#94a3b8";
+                            colorClass = "stroke-slate-400";
                         }
                     } else {
                         // Default
@@ -228,7 +228,7 @@ const SystemMap: React.FC<SystemMapProps> = ({ focusOnNode, interactive = true, 
 
                     return (
                         <g key={`${link.from}-${link.to}`} style={{ opacity, transition: 'opacity 0.3s' }}>
-                            <line x1={link.x1} y1={link.y1} x2={link.x2} y2={link.y2} stroke={color} strokeWidth={strokeWidth} markerEnd={marker} />
+                            <line x1={link.x1} y1={link.y1} x2={link.x2} y2={link.y2} className={colorClass} strokeWidth={strokeWidth} markerEnd={marker} />
                         </g>
                     );
                 })}
@@ -249,10 +249,10 @@ const SystemMap: React.FC<SystemMapProps> = ({ focusOnNode, interactive = true, 
                             onPointerLeave={() => !draggingId && setHoveredId(null)}
                         >
                             {/* Halo */}
-                            <circle cx={node.x} cy={node.y} r={isActive || isFocused ? 4 : 0} fill="none" stroke={color} strokeWidth="0.5" opacity="0.5" className="transition-all duration-300" />
+                            <circle cx={node.x} cy={node.y} r={isActive || isFocused ? 4 : 0} fill="none" strokeWidth="0.5" opacity="0.5" className={`transition-all duration-300 ${color.stroke}`} />
                             
                             {/* Body */}
-                            <circle cx={node.x} cy={node.y} r={isFocused ? 2.5 : 1.5} fill={color} className="transition-all duration-300" />
+                            <circle cx={node.x} cy={node.y} r={isFocused ? 2.5 : 1.5} className={`transition-all duration-300 ${color.fill}`} />
 
                             {/* Label */}
                             <text 
@@ -260,8 +260,7 @@ const SystemMap: React.FC<SystemMapProps> = ({ focusOnNode, interactive = true, 
                                 y={node.y + (isFocused ? 5 : 4)} 
                                 fontSize={isFocused ? "3" : "2.5"} 
                                 textAnchor="middle" 
-                                fill={isActive || isFocused ? "#fff" : "#94a3b8"} 
-                                className="font-mono font-bold pointer-events-none transition-all select-none"
+                                className={`font-mono font-bold pointer-events-none transition-all select-none ${isActive || isFocused ? "fill-white" : "fill-slate-400"}`}
                                 style={{ textShadow: isActive || isFocused ? '0 1px 2px black' : 'none' }}
                             >
                                 {node.id}
