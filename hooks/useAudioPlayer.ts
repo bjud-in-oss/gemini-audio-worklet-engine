@@ -105,7 +105,7 @@ export function useAudioPlayer({ sampleRate = 24000, outputDeviceId }: UseAudioP
         return 1.0 + boost;
     };
 
-    const processQueue = useCallback(() => {
+    const processQueue = useCallback(function loop() {
         if (audioContextRef.current) {
             const ctx = audioContextRef.current;
             const now = ctx.currentTime;
@@ -213,7 +213,7 @@ export function useAudioPlayer({ sampleRate = 24000, outputDeviceId }: UseAudioP
             }
         }
 
-        animationFrameRef.current = requestAnimationFrame(processQueue);
+        animationFrameRef.current = requestAnimationFrame(loop);
     }, []);
 
     useEffect(() => {
