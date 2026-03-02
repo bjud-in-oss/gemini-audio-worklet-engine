@@ -14,7 +14,8 @@ export function useTabCoordination(
 ) {
     const [otherTabs, setOtherTabs] = useState<TabState[]>([]);
     const channelRef = useRef<BroadcastChannel | null>(null);
-    const myIdRef = useRef<string>(Math.random().toString(36).substring(7));
+    const [myId] = useState(() => Math.random().toString(36).substring(7));
+    const myIdRef = useRef<string>(myId);
 
     // Initialize Channel
     useEffect(() => {
