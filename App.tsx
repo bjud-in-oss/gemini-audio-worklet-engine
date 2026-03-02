@@ -250,9 +250,9 @@ const App: React.FC = () => {
   const hasLanguages = targetLanguages.length > 0 && targetLanguages[0] !== '';
 
   return (
-    <div className="h-screen w-screen bg-[#101010] text-white overflow-hidden font-sans relative flex flex-col items-center justify-center">
+    <div className="h-screen w-screen bg-slate-950 text-white overflow-hidden font-sans relative flex flex-col items-center justify-center">
       
-      <div className="absolute inset-0 bg-gradient-to-b from-[#1a1a1a] to-[#050505] z-0"></div>
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-900 to-slate-950 z-0"></div>
       
       {/* HEADER CONTROLS (Handles Hero Animation internally) */}
       <HeaderControls 
