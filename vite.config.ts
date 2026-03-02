@@ -1,6 +1,7 @@
 import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
@@ -21,7 +22,7 @@ export default defineConfig(({ mode }) => {
           "Cross-Origin-Embedder-Policy": "require-corp",
         },
       },
-      plugins: [react()],
+      plugins: [react(), tailwindcss()],
       // CRITICAL FIX: Ensure workers are compiled as ES Modules.
       worker: {
         format: 'es',
