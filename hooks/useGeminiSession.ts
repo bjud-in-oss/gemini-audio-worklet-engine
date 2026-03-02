@@ -42,7 +42,7 @@ export function useGeminiSession(callbacks: SessionCallbacks) {
     // NEW: Track the ID of the current connection attempt to ignore stale events
     const connectionIdRef = useRef<number>(0);
 
-    const connect = useCallback(async (config: SessionConfig, isRetry = false) => {
+    const connect = useCallback(async function connectInternal(config: SessionConfig, isRetry = false) {
         // TRUTH CHECK: API Key
         if (!config.apiKey || config.apiKey.length < 10) {
             console.error("[Session] ❌ CRITICAL: API_KEY appears invalid or missing.");
@@ -185,7 +185,7 @@ export function useGeminiSession(callbacks: SessionCallbacks) {
                                  setStatus(ExtendedStatus.RECOVERING);
                                  try { sessionRef.current?.close(); } catch(err) {}
                                  sessionRef.current = null;
-                                 retryTimeoutRef.current = setTimeout(() => connect(config, true), backoffDelay);
+                                 retryTimeoutRef.current = setTimeout(() => connectInternal(config, true), backoffDelay);
                              }
                              return;
                         }
@@ -229,7 +229,7 @@ export function useGeminiSession(callbacks: SessionCallbacks) {
                 retryCountRef.current += 1;
                 console.warn(`[Session] Immediate startup error (${msg}), retrying in ${backoffDelay}ms...`);
                 setStatus(ExtendedStatus.RECOVERING);
-                retryTimeoutRef.current = setTimeout(() => connect(config, true), backoffDelay);
+                retryTimeoutRef.current = setTimeout(() => connectInternal(config, true), backoffDelay);
                 return;
             }
 
@@ -288,7 +288,12 @@ export function useGeminiSession(callbacks: SessionCallbacks) {
             try {
                 // We access the underlying send method to dispatch a control message
                 // This forces the server VAD to consider the user 'done'
-                if (typeof (sessionRef.current as any).send === 'function') {
+                if (typeof (sessionRef.current as any).sendClientContent === 'function') {
+                    (sessionRef.current as any).sendClientContent({ turnComplete: true });
+                    if ((window as any).APP_LOGS_ENABLED) {
+                        console.log("%c[Network] 🛑 SENT END_OF_TURN SIGNAL", "color: red; font-weight: bold;");
+                    }
+                } else if (typeof (sessionRef.current as any).send === 'function') {
                     (sessionRef.current as any).send({ clientContent: { turnComplete: true } });
                     if ((window as any).APP_LOGS_ENABLED) {
                         console.log("%c[Network] 🛑 SENT END_OF_TURN SIGNAL", "color: red; font-weight: bold;");
@@ -308,7 +313,16 @@ export function useGeminiSession(callbacks: SessionCallbacks) {
             try {
                 // This format forces the model to treat the text as "User Input"
                 // and respond immediately due to turnComplete: true
-                if (typeof (sessionRef.current as any).send === 'function') {
+                if (typeof (sessionRef.current as any).sendClientContent === 'function') {
+                    (sessionRef.current as any).sendClientContent({
+                        turns: [{
+                            role: 'user',
+                            parts: [{ text: text }]
+                        }],
+                        turnComplete: true
+                    });
+                    console.log(`%c[Puppeteer] 📨 Signal sent: ${text}`, "color: fuchsia; font-weight: bold;");
+                } else if (typeof (sessionRef.current as any).send === 'function') {
                     (sessionRef.current as any).send({
                         clientContent: {
                             turns: [{
