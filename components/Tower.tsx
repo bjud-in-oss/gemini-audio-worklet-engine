@@ -87,6 +87,20 @@ interface TowerProps {
     setJitterIntensity?: (val: number) => void;
 }
 
+const SectionHeader = ({ title, id, isOpen, onToggle }: { title: string, id: string, isOpen: boolean, onToggle: (id: string) => void }) => (
+    <div 
+        onClick={() => onToggle(id)}
+        className="flex items-center justify-between cursor-pointer mb-2 group select-none hover:bg-slate-900/30 p-1 rounded transition-colors"
+    >
+        <div className="text-[10px] font-bold text-slate-500 uppercase group-hover:text-slate-300 transition-colors">
+            {title}
+        </div>
+        <div className="text-slate-600 text-[10px] font-mono group-hover:text-slate-400">
+            {isOpen ? '[-]' : '[+]'}
+        </div>
+    </div>
+);
+
 const Tower: React.FC<TowerProps> = ({ 
     diagnosticsRef, 
     isConnected, 
